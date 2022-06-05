@@ -1,0 +1,90 @@
+{
+    "model_config": "config/caption/cross_modal_encoder_base.json",
+    "mrm_prob": 0.15,
+    "itm_neg_prob": 0.5,
+    "itm_ot_lambda": 0.1,
+    "max_txt_len": 60,
+    "conf_th": 0.2,
+    "max_bb": 100,
+    "min_bb": 10,
+    "num_bb": 36,
+    "train_batch_size": 10,
+    "val_batch_size": 10,
+    "use_vit":false,
+    "use_patch":true,
+    "beam_width": 1,
+    "gradient_accumulation_steps": 1,
+    "start_learning_rate": 1e-05,
+    "valid_steps": 1000,
+    "decay_steps": 226452,
+    "optim": "adamw",
+    "image_size":448,
+    "patch_size":32,
+    "sequentialize":true,
+    "img_dim":768,
+    "epochs": 10,
+    "betas": [
+        0.9,
+        0.98
+    ],
+    "dropout": 0.1,
+    "weight_decay": 0.01,
+    "grad_norm": 5.0,
+    "warmup_steps": 1000,
+    "seed": 42,
+    "fp16": true,
+    "n_workers": 12,
+    "audio_preprocess_config": "./fastspeech2_ms/config/AISHELL3/preprocess.yaml",
+    "audio_model_config": "./fastspeech2_ms/config/AISHELL3/model.yaml",
+    "pin_mem": true,
+    "vocab_path": "dataset/caption/ids_to_tokens_zh.json",
+    "use_validate": false,
+    "use_img_output": true,
+    "use_audio_output": true,
+    "data_type": 2,
+    "show_time": true,
+    "name_txt": "id2len_two_mscoco.json",
+    "name_img": "img2len_two.json",
+    "name_audio": "audio2len.json",
+    "name_txt_only": "none",
+    "ids_train_path": "dataset/caption/train/train_coco_v2.json",
+    "train_datasets": [
+        {
+            "name": "coco",
+            "db": [
+                "dataset/caption/train/txt"
+            ],
+            "img": [
+                "dataset/caption/train/img/train2014"
+            ],
+            "audio": [
+                "dataset/caption/train/aud"
+            ],
+            "tasks": [
+                "ftCap"
+            ],
+            "mix_ratio": [
+                1
+            ]
+        }
+    ],
+    "caption_eval_gt" : "dataset/caption/val/coco_trans_captions.json",
+    "ids_val_path": "dataset/caption/val/val_coco_v2.json",
+    "val_datasets": [
+        {
+            "name": "coco",
+            "db": [
+                "dataset/caption/train/txt"
+            ],
+            "img": [
+                "dataset/caption/train/img/train2014"
+            ],
+            "audio":[
+                "dataset/caption/train/aud"
+            ],
+            "tasks": [
+                "ftCap"
+            ]
+        }
+    ]
+}

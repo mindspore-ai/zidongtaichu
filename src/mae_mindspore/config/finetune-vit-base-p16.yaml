@@ -1,0 +1,69 @@
+# model config
+model_config:
+    encoder_layers: 12
+    encoder_num_heads: 12
+    encoder_dim: 768
+    mlp_ratio: 4
+
+# context config
+seed: 2022
+use_parallel: True
+context:
+    mode: 0 #0--Graph Mode; 1--Pynative Mode
+    device_target: "Ascend"
+    max_call_depth: 10000
+    save_graphs: False
+    device_id: 7
+
+# dataset base
+dataset_name: "imagenet"
+eval_engine: 'imagenet'
+
+# train dataset
+dataset_path: "/mnt/vision/ImageNet1K/CLS-LOC/train"
+train_num_workers: 14
+interpolation: "BILINEAR"
+train_image_size: 224
+autoaugment: 1
+crop_min: 0.2
+mixup: 0.8
+
+# eval datasets
+eval_path: '/mnt/vision/ImageNet1K/CLS-LOC/val'
+eval_image_size: 224
+eval_batch_size: 32
+eval_interval: 1
+eval_offset: -1
+eval_num_workers: 12
+
+# train config
+epoch: 100
+batch_size: 32
+patch_size: 16
+sink_mode: True
+dropout: 0.1
+num_classes: 1001
+per_step_size: 0
+finetune_ckpt: "obs://muti-modal/mae-vit-base-p16/lr2.4e-3-LN/MAEVIT-B-300_312.ckpt"
+
+# loss
+loss_scale: 1024
+use_label_smooth: 1
+label_smooth_factor: 0.1
+loss_name: "ce_smooth_mixup"
+
+# optimizer
+beta1: 0.9
+beta2: 0.999
+weight_decay: 0.05
+
+# lr sechdule
+start_learning_rate: 0.002  # base_lr(5e-4) * device_num * batch_size / 256
+end_learning_rate: 0.000001
+warmup_epochs: 5
+
+# callback
+save_ckpt_epochs: 10
+ckpt_save_dir: "/cache/ckpt"
+prefix: "MAEVIT-B"
+obs_dir: "obs://muti-modal/finetunevit-base-p16/lr2e-3"

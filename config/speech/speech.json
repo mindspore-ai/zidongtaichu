@@ -1,0 +1,78 @@
+{
+  "model_config": "config/speech/cross_modal_encoder_small_config.json",
+  "output_dir": "checkpoints/speech",
+  "mrm_prob": 0.15,
+  "itm_neg_prob": 0.5,
+  "itm_ot_lambda": 0.1,
+  "max_txt_len": 60,
+  "conf_th": 0.2,
+  "max_bb": 100,
+  "min_bb": 10,
+  "num_bb": 36,
+  "train_batch_size": 10,
+  "val_batch_size": 10,
+  "gradient_accumulation_steps": 1,
+  "learning_rate": 5e-05,
+  "valid_steps": 1000,
+  "num_train_steps": 1000000,
+  "optim": "adamw",
+  "betas": [
+    0.9,
+    0.98
+  ],
+  "dropout": 0.1,
+  "weight_decay": 0.01,
+  "grad_norm": 5.0,
+  "warmup_steps": 1000,
+  "seed": 42,
+  "fp16": true,
+  "n_workers": 12,
+  "pin_mem": true,
+  "image_size":448,
+  "patch_size":32,
+  "ids_train_path": "datasets/speech/data/train_aishell3.json",
+  "vocab_path": "datasets/speech/data/ids_to_tokens_zh.json",
+  "use_validate": false,
+  "show_time": true,
+  "audio_preprocess_config": "src/fastspeech2_mindspore/config/AISHELL3/preprocess.yaml",
+  "audio_model_config": "src/fastspeech2_mindspore/config/AISHELL3/model.yaml",
+  "audio_mel_path": "datasets/speech",
+  "train_datasets": [
+    {
+      "name": "open",
+      "db": [
+        "datasets/speech/data"
+      ],
+      "img": [
+        "datasets/speech/img"
+      ],
+      "audio": [
+        "datasets/speech/audio"
+      ],
+      "tasks": [
+        "adText"
+      ],
+      "mix_ratio": [
+        1
+      ]
+    }
+  ],
+  "ids_val_path": "datasets/speech/data/val_aishell3.json",
+  "val_datasets": [
+    {
+      "name": "open",
+      "db": [
+        "datasets/speech/data"
+      ],
+      "img": [
+        "datasets/speech/img"
+      ],
+      "audio": [
+        "datasets/speech/audio"
+      ],
+      "tasks": [
+        "adTextEval"
+      ]
+    }
+  ]
+}

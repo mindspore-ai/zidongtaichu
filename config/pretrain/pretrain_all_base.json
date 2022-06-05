@@ -1,0 +1,80 @@
+{
+  "model_config": "config/pretrain/cross_modal_encoder_config.json",
+  "mrm_prob": 0.15,
+  "itm_neg_prob": 0.5,
+  "itm_ot_lambda": 0.1,
+  "max_txt_len": 60,
+  "conf_th": 0.2,
+  "max_bb": 100,
+  "min_bb": 10,
+  "num_bb": 36,
+  "train_batch_size": 10,
+  "val_batch_size": 10,
+  "gradient_accumulation_steps": 1,
+  "learning_rate": 5e-05,
+  "valid_steps": 1000,
+  "num_train_steps": 1000000,
+  "optim": "adamw",
+  "betas": [
+    0.9,
+    0.98
+  ],
+  "dropout": 0.1,
+  "weight_decay": 0.01,
+  "grad_norm": 5.0,
+  "warmup_steps": 1000,
+  "seed": 42,
+  "fp16": true,
+  "n_workers": 12,
+  "pin_mem": true,
+  "ids_train_path": "/mnt/sfs_turbo/baidu_data_1000w_zh/train_three_check.json",
+  "vocab_path": "/mnt/sfs_turbo/baidu_data_1000w_zh/ids_to_tokens_zh.json",
+  "img_token_path": "/mnt/sfs_turbo/baidu_vae_1000w",
+  "use_validate": false,
+  "show_time": true,
+  "use_vit": true,
+  "use_patch": true,
+  "patch_size": 32,
+  "image_size": 448,
+  "epoch": 100,
+  "vit_ckpt_file": "/mnt/sfs_turbo/vit_ckpt/VIT-B-P32-448-292_312.ckpt",
+  "train_datasets": [
+    {
+      "name": "open",
+      "db": [
+        "/mnt/sfs_turbo/baidu_data_1000w_zh"
+      ],
+      "img": [
+        "/mnt/sfs_turbo/baidu_images_1000w"
+      ],
+      "audio": [
+        "/mnt/sfs_turbo/baidu_audio_1000w_npz"
+      ],
+      "tasks": [
+        "mlmThree",
+        "itmThree"
+      ],
+      "mix_ratio": [
+        1, 1
+      ]
+    }
+  ],
+  "ids_val_path": "/data/val_ids.json",
+  "val_datasets": [
+    {
+      "name": "open",
+      "db": [
+        "/data/txt_data"
+      ],
+      "img": [
+        "/data/img_data"
+      ],
+      "audio": [
+        "/data/audio_data"
+      ],
+      "tasks": [
+        "mlmThree"
+      ]
+    }
+  ]
+}
