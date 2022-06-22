@@ -19,21 +19,44 @@ from mindspore.common.tensor import Tensor
 
 from src.model_mindspore.model_config import UniterConfig
 from src.config import config as C
-from .pretrain_ms import UniterThreeForPretrainingWithLoss
-class UniterThreeForPretrainingForRetFinetune(UniterThreeForPretrainingWithLoss):
+from src.model_mindspore.parallel_transformer import ParallelConfig
+from src.model_mindspore.model_ms import UniterThreeModel
+class UniterThreeForPretrainingForRetFinetune(nn.Cell):
     """ UNITER pretraining """
 
     def __init__(self, config, img_dim, img_label_dim, audio_dim, audio_label_dim,
                  use_txt_out=False, use_video=False, full_batch=True, use_moe=False, is_parallel=True, args=None, margin=0.2):
-        super(UniterThreeForPretrainingForRetFinetune, self).__init__(config, img_dim, img_label_dim, audio_dim,
-                                                                      audio_label_dim,
-                                                                      use_txt_out, use_video, full_batch, use_moe, is_parallel, args)
+        super(UniterThreeForPretrainingForRetFinetune, self).__init__()
+        parallel_config = ParallelConfig()
+        self.is_parallel = is_parallel
+        self.use_txt_out = use_txt_out
+        self.use_video = use_video
+        if self.use_video:
+            img_dim = 1024
         config = UniterConfig.from_json_file(config)
+        config.full_batch = full_batch
+        self.uniter = UniterThreeModel(config, img_dim, audio_dim, use_video, parallel_config, use_moe, is_parallel)
+
+        self.itm_output = nn.Dense(config.hidden_size, 5).to_float(mindspore.float16)
+        self.itm_output.matmul.shard(((parallel_config.dp, 1), (1, 1)))
+        self.itm_output.bias_add.shard(((parallel_config.dp, 1), (1,)))
+        self.itm_output.weight.parallel_optimizer = False
+        self.itm_output.bias.parallel_optimizer = False
+
+        self.full_batch = full_batch
+        self.stride_slice_1 = ops.StridedSlice().shard(((1,),))
+        self.stride_slice_2 = ops.StridedSlice().shard(((1, 1),))
+
+        self.mean = ops.ReduceMean().shard(((1,),))
+
         self.rank_output = nn.Dense(config.hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
         self.margin = margin
         self.min_value = Tensor(0, mindspore.float32)
         self.max_value = Tensor(100, mindspore.float32)
+        self.print = ops.Print()
+        if self.is_parallel:
+            self.allgather = ops.AllGather()
 
     def init_output(self):
         self.rank_output.weight.set_data(self.itm_output.weight.data[2:3, :])
@@ -68,23 +91,38 @@ class UniterThreeForPretrainingForRetFinetune(UniterThreeForPretrainingWithLoss)
         neg = self.stride_slice_2(scores, (0, 1), (scores.shape[0], scores.shape[1]), (1, 1))
         mat = self.margin + neg - pos
         rank_loss = ops.clip_by_value(mat, self.min_value, self.max_value)
+        rank_loss = self.allgather(rank_loss)
         rank_loss_mean = rank_loss.mean()
+
         return rank_loss_mean
 
-class UniterThreeForPretrainingForRetFinetuneEval(UniterThreeForPretrainingWithLoss):
+class UniterThreeForPretrainingForRetFinetuneEval(nn.Cell):
     """ UNITER pretraining ret ft eval """
 
     def __init__(self, config, img_dim, img_label_dim, audio_dim, audio_label_dim,
                  use_txt_out=False, use_video=False, full_batch=True, use_moe=False, is_parallel=True, args=None, margin=0.2):
-        super(UniterThreeForPretrainingForRetFinetuneEval, self).__init__(config, img_dim, img_label_dim, audio_dim,
-                                                                      audio_label_dim,
-                                                                      use_txt_out, use_video, full_batch, use_moe, is_parallel, args)
+        super(UniterThreeForPretrainingForRetFinetuneEval, self).__init__()
+        parallel_config = ParallelConfig()
+        self.is_parallel = is_parallel
+        self.use_txt_out = use_txt_out
+        self.use_video = use_video
+        if self.use_video:
+            img_dim = 1024
         config = UniterConfig.from_json_file(config)
+        config.full_batch = full_batch
+        self.uniter = UniterThreeModel(config, img_dim, audio_dim, use_video, parallel_config, use_moe, is_parallel)
+
+        self.itm_output = nn.Dense(config.hidden_size, 5).to_float(mindspore.float16)
+        self.itm_output.matmul.shard(((parallel_config.dp, 1), (1, 1)))
+        self.itm_output.bias_add.shard(((parallel_config.dp, 1), (1,)))
+        self.itm_output.weight.parallel_optimizer = False
+        self.itm_output.bias.parallel_optimizer = False
+
+        self.full_batch = full_batch
+        self.stride_slice_1 = ops.StridedSlice().shard(((1,),))
+        self.stride_slice_2 = ops.StridedSlice().shard(((1, 1),))
         self.rank_output = nn.Dense(config.hidden_size, 1)
-        self.sigmoid = nn.Sigmoid()
-        self.margin = margin
-        self.min_value = Tensor(0, mindspore.float32)
-        self.max_value = Tensor(100, mindspore.float32)
+
         self.is_parallel = is_parallel
         if self.is_parallel:
             self.allgather = ops.AllGather()
