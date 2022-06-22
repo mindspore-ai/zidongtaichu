@@ -61,7 +61,7 @@ do
     nohup python -u src/scripts/train_retrieval.py \
         --config=config/retrieval/$task_config_file \
         --output_dir=$output_dir/$task_name \
-        --ckpt_file=model/retrieval/$pretrain_ckpt_file \
+        --pretrain_ckpt_file=model/retrieval/$pretrain_ckpt_file \
         --use_parallel="true" \
         --eval_only=False \
         > $output_dir/$task_name/rank_$i/log_train 2>&1 &

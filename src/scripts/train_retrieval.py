@@ -124,7 +124,17 @@ def init_env(opts):
 def load_ckpt(net_with_grads, ckpt_file):
     if not ckpt_file:
         return
-    print('load ckpt:', ckpt_file)
+    print('start load ckpt:', ckpt_file)
+    params_dict = load_checkpoint(ckpt_file)
+    if params_dict:
+        param_not_load = load_param_into_net(net_with_grads, params_dict)
+        print("param_not_load:", param_not_load)
+    print('end load ckpt:', ckpt_file)
+
+def load_pretrain_ckpt(net_with_grads, ckpt_file):
+    if not ckpt_file:
+        return
+    print('start load pretrain ckpt:', ckpt_file)
     params_dict = load_checkpoint(ckpt_file)
     if params_dict:
         new_params_dict = {}
@@ -138,9 +148,9 @@ def load_ckpt(net_with_grads, ckpt_file):
         new_params_dict["uniter.embeddings.word_embeddings.embedding_table"] = new_params_dict["cls.predictions.decoder.weight"]
         param_not_load = load_param_into_net(net_with_grads, new_params_dict)
         print("param_not_load:", param_not_load)
-    print("init model......................................")
     net_with_grads.init_output()
-    print('load ckpt:', ckpt_file)
+    print("model init: load itm weight")
+    print('end load pretrain ckpt:', ckpt_file)
 
 class LearningRate(LearningRateSchedule):
     """ LearningRate """
@@ -199,8 +209,10 @@ def main(opts):
                                                                 use_txt_out=opts.use_txt_out, use_video=opts.use_video,
                                                                 full_batch=opts.full_batch, use_moe=opts.use_moe,
                                                                        is_parallel=opts.use_parallel)
-        ckpt_file = opts.ckpt_file
-        load_ckpt(net_without_loss, ckpt_file)
+
+        load_ckpt(net_without_loss, opts.ckpt_file)
+        load_pretrain_ckpt(net_without_loss, opts.pretrain_ckpt_file)
+
         model = Model(net_without_loss)
         ids = json.load(open(opts.ids_val_path,'r'))
         print("retrieval dataset's length is: ", len(ids))
@@ -215,8 +227,8 @@ def main(opts):
                                                             full_batch=opts.full_batch, use_moe=opts.use_moe,
                                                                        is_parallel=opts.use_parallel)
     # load ckpt
-    ckpt_file = opts.ckpt_file
-    load_ckpt(net_with_loss, ckpt_file)
+    load_ckpt(net_with_loss, opts.ckpt_file)
+    load_pretrain_ckpt(net_with_loss, opts.pretrain_ckpt_file)
 
     # learning rate and optimizer
     lr = LearningRate(opts.start_learning_rate, opts.end_learning_rate, opts.warmup_steps, opts.decay_steps)
@@ -242,7 +254,7 @@ def main(opts):
     # set callbacks
     if rank_id == 0:
         config_ck = CheckpointConfig(save_checkpoint_steps=opts.save_checkpoint_steps,
-                                     keep_checkpoint_max=1,
+                                     keep_checkpoint_max=5,
                                      integrated_save=False)
         ckpoint_cb = ModelCheckpoint(prefix="OPT_ret",
                                      directory=ckpt_dir,
@@ -284,15 +296,10 @@ def validate_itm_matching(model, val_ds, pair_num=1000, is_parallel = True):
             break
 
     if not is_parallel or get_rank()==0:
-        print("===========n_ex=", n_ex)
         score_vec = score_vec[:n_ex]
-        print(score_vec.shape)
-        print(score_vec)
         k = 10
         score_mat = score_vec.reshape((int(math.sqrt(n_ex)), -1))
 
-        print(score_mat)
-        print("........................",score_mat.dtype,score_mat.shape,int(math.sqrt(n_ex)))
         max_targets = np.arange(0, int(math.sqrt(n_ex)), dtype=np.int64)
         values, topk_indices = topk(score_mat, 10)
         topk_ind = topk_indices.asnumpy()
@@ -301,7 +308,6 @@ def validate_itm_matching(model, val_ds, pair_num=1000, is_parallel = True):
         tr_r1 = (rank < 1).sum().item() / int(math.sqrt(n_ex))
         tr_r5 = (rank < 5).sum().item() / int(math.sqrt(n_ex))
         tr_r10 = (rank < 10).sum().item() / int(math.sqrt(n_ex))
-        print(tr_r1, tr_r5, tr_r10)
 
         score_mat = score_mat.T
         values, topk_indices = topk(score_mat, 10)
@@ -311,7 +317,6 @@ def validate_itm_matching(model, val_ds, pair_num=1000, is_parallel = True):
         ir_r1 = (rank < 1).sum().item() / int(math.sqrt(n_ex))
         ir_r5 = (rank < 5).sum().item() / int(math.sqrt(n_ex))
         ir_r10 = (rank < 10).sum().item() / int(math.sqrt(n_ex))
-        print(ir_r1, ir_r5, ir_r10)
 
         ret_logs = {}
         ret_logs["ir_r1"] = ir_r1
@@ -342,11 +347,11 @@ if __name__ == "__main__":
     parser.add_argument('--dataset_sink_mode', default=False, type=str2bool, help='dataset sink mode')
     parser.add_argument("--eval_only", default=False, type=str2bool,
                         help="eval only?")
-    parser.add_argument("--start_learning_rate", default=5e-5, type=float,
+    parser.add_argument("--start_learning_rate", default=2.5e-5, type=float,
                         help="The initial learning rate for Adam.")
-    parser.add_argument("--end_learning_rate", default=1e-7, type=float,
+    parser.add_argument("--end_learning_rate", default=1e-8, type=float,
                         help="The end learning rate for Adam.")
-    parser.add_argument("--decay_steps", default=120000, type=int,
+    parser.add_argument("--decay_steps", default=20000, type=int,
                         help="The decay step.")
     parser.add_argument('--use_txt_out', default=False,
                         type=str2bool, help='use txt out')
@@ -378,9 +383,11 @@ if __name__ == "__main__":
                         type=float, help="scale window")
     parser.add_argument("--ckpt_file", default=None,
                         type=str, help="ckpt file path to load")
+    parser.add_argument("--pretrain_ckpt_file", default=None,
+                        type=str, help="pretrain ckpt file path to load")
     parser.add_argument("--save_checkpoint_steps",
-                        default=0, type=int, help="save checkpoint steps")
-    parser.add_argument("--epochs", default=10,
+                        default=5000, type=int, help="save checkpoint steps")
+    parser.add_argument("--epochs", default=3,
                         type=int, help="epochs")
     parser.add_argument("--full_batch", default=False,
                         type=bool, help="use full batch")
