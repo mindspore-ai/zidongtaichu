@@ -124,17 +124,17 @@ def init_env(opts):
 def load_ckpt(net_with_grads, ckpt_file):
     if not ckpt_file:
         return
-    print('load ckpt:', ckpt_file)
+    print('start load ckpt:', ckpt_file)
     params_dict = load_checkpoint(ckpt_file)
     if params_dict:
         param_not_load = load_param_into_net(net_with_grads, params_dict)
         print("param_not_load:", param_not_load)
-    print('load ckpt:', ckpt_file)
+    print('end load ckpt:', ckpt_file)
 
 def load_pretrain_ckpt(net_with_grads, ckpt_file):
     if not ckpt_file:
         return
-    print('load pretrain ckpt:', ckpt_file)
+    print('start load pretrain ckpt:', ckpt_file)
     params_dict = load_checkpoint(ckpt_file)
     if params_dict:
         new_params_dict = {}
@@ -148,10 +148,9 @@ def load_pretrain_ckpt(net_with_grads, ckpt_file):
         new_params_dict["uniter.embeddings.word_embeddings.embedding_table"] = new_params_dict["cls.predictions.decoder.weight"]
         param_not_load = load_param_into_net(net_with_grads, new_params_dict)
         print("param_not_load:", param_not_load)
-    print("init model......................................")
     net_with_grads.init_output()
-    print("load itm weight")
-    print('load pretrain ckpt:', ckpt_file)
+    print("model init: load itm weight")
+    print('end load pretrain ckpt:', ckpt_file)
 
 class LearningRate(LearningRateSchedule):
     """ LearningRate """
@@ -297,15 +296,10 @@ def validate_itm_matching(model, val_ds, pair_num=1000, is_parallel = True):
             break
 
     if not is_parallel or get_rank()==0:
-        print("===========n_ex=", n_ex)
         score_vec = score_vec[:n_ex]
-        print(score_vec.shape)
-        print(score_vec)
         k = 10
         score_mat = score_vec.reshape((int(math.sqrt(n_ex)), -1))
 
-        print(score_mat)
-        print("........................",score_mat.dtype,score_mat.shape,int(math.sqrt(n_ex)))
         max_targets = np.arange(0, int(math.sqrt(n_ex)), dtype=np.int64)
         values, topk_indices = topk(score_mat, 10)
         topk_ind = topk_indices.asnumpy()
@@ -314,7 +308,6 @@ def validate_itm_matching(model, val_ds, pair_num=1000, is_parallel = True):
         tr_r1 = (rank < 1).sum().item() / int(math.sqrt(n_ex))
         tr_r5 = (rank < 5).sum().item() / int(math.sqrt(n_ex))
         tr_r10 = (rank < 10).sum().item() / int(math.sqrt(n_ex))
-        print(tr_r1, tr_r5, tr_r10)
 
         score_mat = score_mat.T
         values, topk_indices = topk(score_mat, 10)
@@ -324,7 +317,6 @@ def validate_itm_matching(model, val_ds, pair_num=1000, is_parallel = True):
         ir_r1 = (rank < 1).sum().item() / int(math.sqrt(n_ex))
         ir_r5 = (rank < 5).sum().item() / int(math.sqrt(n_ex))
         ir_r10 = (rank < 10).sum().item() / int(math.sqrt(n_ex))
-        print(ir_r1, ir_r5, ir_r10)
 
         ret_logs = {}
         ret_logs["ir_r1"] = ir_r1

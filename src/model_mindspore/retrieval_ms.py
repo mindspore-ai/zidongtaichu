@@ -85,7 +85,7 @@ class UniterThreeForPretrainingForRetFinetune(nn.Cell):
         pooled_output = self.uniter.pooler(sequence_output)
         rank_scores = self.rank_output(pooled_output)
         rank_scores_sigmoid = self.sigmoid(rank_scores)
-        sample_size = 3  # 2*neg_sameles+1
+        sample_size = 3  # 2*neg_samples+1
         scores = rank_scores_sigmoid.view(-1, sample_size)
         pos = self.stride_slice_2(scores, (0, 0), (scores.shape[0], 1), (1, 1))
         neg = self.stride_slice_2(scores, (0, 1), (scores.shape[0], scores.shape[1]), (1, 1))
