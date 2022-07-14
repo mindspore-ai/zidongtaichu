@@ -339,7 +339,7 @@ class VariancePredictor(nn.Cell):
                     ),
                     ("relu_1", nn.ReLU()),
                     ("layer_norm_1", nn.LayerNorm((self.filter_size,))),
-                    ("dropout_1", nn.Dropout(self.dropout)),
+                    ("dropout_1", nn.Dropout(1 - self.dropout)),
                     (
                         "conv1d_2",
                         Conv(
@@ -351,7 +351,7 @@ class VariancePredictor(nn.Cell):
                     ),
                     ("relu_2", nn.ReLU()),
                     ("layer_norm_2", nn.LayerNorm((self.filter_size,))),
-                    ("dropout_2", nn.Dropout(self.dropout)),
+                    ("dropout_2", nn.Dropout(1 - self.dropout)),
                 ]
             )
         )

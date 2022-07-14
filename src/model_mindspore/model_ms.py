@@ -158,7 +158,7 @@ class UniterTextEmbeddings(nn.Cell):
         # self.LayerNorm is not snake-cased to stick with TensorFlow model
         # variable name and be able to load any TensorFlow checkpoint file
         self.layernorm = LayerNorm((config.hidden_size,), parallel_config.dp)
-        self.dropout = Dropout(config.hidden_dropout_prob).shard(((parallel_config.dp, 1, 1),))
+        self.dropout = Dropout(1 - config.hidden_dropout_prob).shard(((parallel_config.dp, 1, 1),))
         self.zeros_like = P.ZerosLike().shard(((parallel_config.dp, 1),))
         self.add = P.TensorAdd().shard(((parallel_config.dp, 1, 1), (parallel_config.dp, 1, 1)))
         self.add1 = P.TensorAdd().shard(((parallel_config.dp, 1, 1), (1, 1, 1)))
@@ -210,7 +210,7 @@ class UniterImageEmbeddings(nn.Cell):
 
         # tf naming convention for layer norm
         self.LayerNorm = LayerNorm((config.hidden_size,), parallel_config.dp)
-        self.dropout = Dropout(config.hidden_dropout_prob).shard(((parallel_config.dp, 1, 1),))
+        self.dropout = Dropout(1 - config.hidden_dropout_prob).shard(((parallel_config.dp, 1, 1),))
         self.cast = P.Cast()
 
         self.use_vit = getattr(config, 'use_vit', False)
@@ -301,7 +301,7 @@ class UniterAudioEmbeddings(nn.Cell):
 
         # tf naming convention for layer norm
         self.LayerNorm = LayerNorm((config.hidden_size,), parallel_config.dp)
-        self.dropout = Dropout(config.hidden_dropout_prob).shard(((parallel_config.dp, 1, 1),))
+        self.dropout = Dropout(1 - config.hidden_dropout_prob).shard(((parallel_config.dp, 1, 1),))
         self.add = P.TensorAdd().shard(((parallel_config.dp, 1, 1), (parallel_config.dp, 1, 1)))
         self.add1 = P.TensorAdd().shard(((1, 1, 1), (parallel_config.dp, 1, 1)))
         self.cast = P.Cast()
