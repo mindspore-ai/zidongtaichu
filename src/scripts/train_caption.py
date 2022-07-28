@@ -27,7 +27,7 @@ from pathlib2 import Path
 import sys
 sys.path.append('.')
 from src.data import create_dataset
-from src.model_mindspore.cell_wrapper import TrainOneStepWithLossScaleCell
+from src.model_mindspore.cell_wrapper import ParallelTrainOneStepWithLossScaleCell, TrainOneStepWithLossScaleCell
 from src.model_mindspore.optim_ms import build_optimizer
 from src.model_mindspore.caption_ms import UniterThreeForPretrainingForCapFinetune
 from src.model_mindspore.utils import LearningRate
@@ -168,15 +168,24 @@ def main(opts):
     update_cell = DynamicLossScaleUpdateCell(loss_scale_value=opts.init_loss_scale,
                                              scale_factor=opts.loss_scale_factor,
                                              scale_window=opts.scale_window)
-    net_with_grads = TrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer,
-                                                   scale_sense=update_cell)
+    if opts.use_parallel:
+        net_with_grads = ParallelTrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer, 
+        scale_sense=update_cell, parallel_config=ParallelConfig)                
+    else:                                                    
+        net_with_grads = TrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer, 
+        scale_sense=update_cell)
     model = Model(net_with_grads)
-    
-    if rank_id == 0:
-        print("init callback")
-        callback = [TimeMonitor(callback_size), LossMonitor(callback_size)]
-        
-        # modify check point callback
+
+    print("init callback")
+    callback = [TimeMonitor(callback_size), LossMonitor(callback_size)]
+    # modify summary callback
+    if opts.save_summary:
+        specified = {"collect_metric": True, "collect_graph": True, "collect_dataset_graph": True}
+        summary_collector = SummaryCollector(summary_dir=os.path.join(opts.output_dir, 'summary'), 
+        collect_specified_data=specified, collect_freq=1, keep_default_action=False, collect_tensor_freq=200)
+        callback.append(summary_collector)
+    # modify check point callback
+    if rank_id == 0:    
         if not opts.save_checkpoint_steps:
             opts.save_checkpoint_steps = dataset_size
         ckpt_dir = os.path.join(opts.output_dir, "ckpt", f"rank_{str(local_rank)}")
@@ -189,19 +198,9 @@ def main(opts):
                                      directory=ckpt_dir,
                                      config=config_ck)
         callback.append(ckpoint_cb)
-        
-        # modify summary callback
-        if opts.save_summary:
-            specified = {"collect_metric": True, "collect_graph": True, "collect_dataset_graph": True}
-            summary_collector = SummaryCollector(summary_dir=os.path.join(opts.output_dir, 'summary'), collect_specified_data=specified,
-                                         collect_freq=1, keep_default_action=False, collect_tensor_freq=200)
-            callback.append(summary_collector)
-    else:
-        callback = []
 
     print("start_training...")
     model.train(new_epoch, ds, callbacks=callback, dataset_sink_mode=opts.dataset_sink_mode, sink_size=callback_size)
-
 
 def str2bool(b):
     if b.lower() not in ["false", "true"]:
