@@ -55,7 +55,7 @@
                 "dataset/caption/train/txt"
             ],
             "img": [
-                "dataset/caption/train/img/train2014"
+                "dataset/caption/train/img"
             ],
             "audio": [
                 "dataset/caption/train/aud"
@@ -77,7 +77,7 @@
                 "dataset/caption/train/txt"
             ],
             "img": [
-                "dataset/caption/train/img/train2014"
+                "dataset/caption/train/img"
             ],
             "audio":[
                 "dataset/caption/train/aud"
