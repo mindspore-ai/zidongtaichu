@@ -60,8 +60,6 @@ do
         --config=config/caption/$task_config_file \
         --dataset_sink_mode=True \
         --callback_size=-1 \
-        --start_learning_rate=8e-5 \
-        --end_learning_rate=8e-7 \
         --ckpt_file=model/caption/OPT_1-38_136.ckpt \
         --output_dir=$output_dir/$task_name \
         --use_parallel=True \
