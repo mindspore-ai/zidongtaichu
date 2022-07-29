@@ -14,7 +14,6 @@
     "use_patch":true,
     "beam_width": 1,
     "gradient_accumulation_steps": 1,
-    "start_learning_rate": 1e-05,
     "valid_steps": 1000,
     "decay_steps": 226452,
     "optim": "adamw",

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 output_dir="output/caption"
-task_name="finetune_caption_parallel"
+task_name="finetune_caption"
 task_config_file="ft_cap_base.json"
 
 if [ $# != 3 ]
@@ -60,7 +60,8 @@ do
         --config=config/caption/$task_config_file \
         --dataset_sink_mode=True \
         --callback_size=-1 \
-        --start_learning_rate=4e-5 \
+        --start_learning_rate=8e-5 \
+        --end_learning_rate=8e-7 \
         --ckpt_file=model/caption/OPT_1-38_136.ckpt \
         --output_dir=$output_dir/$task_name \
         --use_parallel=True \
