@@ -15,7 +15,6 @@
     "beam_width": 1,
     "gradient_accumulation_steps": 1,
     "valid_steps": 1000,
-    "decay_steps": 226452,
     "optim": "adamw",
     "image_size":448,
     "patch_size":32,
