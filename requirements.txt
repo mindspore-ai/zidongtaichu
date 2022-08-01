@@ -11,3 +11,4 @@ unidecode
 inflect
 pyyaml
 jieba
+matplotlib
