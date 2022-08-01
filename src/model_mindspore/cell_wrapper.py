@@ -189,13 +189,11 @@ class ParallelTrainOneStepWithLossScaleCell(TrainOneStepWithLossScaleCell):
         # Check whether overflow
         cond = self.get_overflow_status(status, grads)
         overflow = self.process_loss_scale(cond)
-        # If overflow, surpass weights update
-        # if not, update weights
-        if overflow:
-            succ = False
-        else:
-            succ = self.optimizer(grads)
-        return F.depend(loss, succ), cond, scaling_sens, args[-1]
+        
+        # if there is no overflow, do optimize
+        if not overflow:
+            loss = F.depend(loss, self.optimizer(grads))
+        return loss, cond, scaling_sens
 
     def _construct_pipeline(self, *args):
         r"""

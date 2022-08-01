@@ -227,7 +227,7 @@ if __name__ == "__main__":
                         help="The end learning rate for Adam.")
     parser.add_argument("--decay_steps", default=0, type=int,
                         help="lr decay steps.")
-    parser.add_argument("--decay_epochs", default=4, type=int, help="lr decay epochs.")
+    parser.add_argument("--decay_epochs", default=10, type=int, help="lr decay epochs.")
     parser.add_argument("--epochs", default=10, type=int, help="")
     
     parser.add_argument('--callback_size', default=100, type=int, help='callback size.')
@@ -236,7 +236,7 @@ if __name__ == "__main__":
     parser.add_argument('--save_summary', default=False, type=str2bool, help='save summary')
     parser.add_argument("--full_batch", default=False, type=bool, help="")
     parser.add_argument('--use_parallel', default=False, type=str2bool, help='use txt out')
-    parser.add_argument('--display_net', default=True, type=str2bool, help='use txt out')
+    parser.add_argument('--display_net', default=False, type=str2bool, help='use txt out')
     
     parser.add_argument('--use_txt_out', default=False, type=str2bool, help='use txt out')
     parser.add_argument('--use_video', default=False, type=str2bool, help='use txt out')
