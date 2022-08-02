@@ -22,7 +22,7 @@ import json
 import sys
 import random
 import numpy as np
-
+import mindspore as ms
 
 class NoOp:
     """ useful for distributed training No-Ops """
@@ -52,7 +52,7 @@ def set_random_seed(seed):
     """Set Random Seed"""
     random.seed(seed)
     np.random.seed(seed)
-
+    ms.set_seed(seed)
 
 class Struct:
     def __init__(self, dict_):
