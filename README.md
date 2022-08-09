@@ -90,6 +90,16 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    启动测试（需安装java1.8.0）：\
    bash scripts/test_caption.sh
 
+   启动推理：\
+   bash scripts/inference_caption.sh \
+   支持对单目录或列表的推理，需要修改脚本中的inference_dir和inference_list参数。 \
+   若存在inference_list则会读取list中的每项文件进行推理（文件目录为inference_dir拼接list中的文件名）；\
+   若inference_list为空则遍历inference_dir中的每个文件执行推理。
+
+   模型导出: \
+   python src/scripts/export_caption.py --ckpt_file="***.ckpt" \
+   默认导出格式为MindIR，可通过file_format进行修改（目前由于框架限制，紫东太初模型仅支持导出MindIR）。
+   
    效果展示：
    <center class = "half">
    <img src = "image/demo/caption/COCO_val2014_000000097315.jpg" height = 250 align = left><img src="image/demo/caption/COCO_val2014_000000573932.jpg"  height = 250 align= right/>

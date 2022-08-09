@@ -16,12 +16,11 @@ import argparse
 import json
 import os
 from os.path import join
-import sys
 from mindspore import context
-from mindspore.common.tensor import Tensor
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 
-sys.path.append('.')
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..")))
 from src.data.generator import get_batch_data_captioneval
 from src.model_mindspore.caption_ms import UniterThreeForPretrainingForCapFinetuneEval
 from src.data.pretrain_three_data import create_three_dataloaders
@@ -40,15 +39,15 @@ def load_ckpt(net, ckpt_file):
     if not ckpt_file:
         return
     print(f"start loading ckpt:{ckpt_file}")
-    params_dict = load_checkpoint(ckpt_file)
-    if params_dict:
-        new_params_dict = {}
-        for key in params_dict.keys():
+    param_dict = load_checkpoint(ckpt_file)
+    if param_dict:
+        new_param_dict = {}
+        for key in param_dict.keys():
             if key.find("txt_output.tfm_decoder") >= 0:
                 key_new = key[:22] + ".decoder.tfm_decoder" + key[22:]
-                new_params_dict[key_new] = params_dict[key]
-            new_params_dict[key] = params_dict[key]
-        param_not_load = load_param_into_net(net, new_params_dict)
+                new_param_dict[key_new] = param_dict[key]
+            new_param_dict[key] = param_dict[key]
+        param_not_load = load_param_into_net(net, new_param_dict)
         print("param not load:", param_not_load)
     print(f"end loading ckpt:{ckpt_file}")
 
@@ -209,7 +208,6 @@ def str2bool(b):
         return False
     # elif b.lower() in ["true"]:
     return True
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
