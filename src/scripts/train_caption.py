@@ -25,7 +25,7 @@ from mindspore.train.model import Model
 from pathlib2 import Path
 
 import sys
-sys.path.append('.')
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..")))
 from src.data import create_dataset
 from src.model_mindspore.cell_wrapper import ParallelTrainOneStepWithLossScaleCell, TrainOneStepWithLossScaleCell
 from src.model_mindspore.optim_ms import build_optimizer
@@ -33,6 +33,7 @@ from src.model_mindspore.caption_ms import UniterThreeForPretrainingForCapFinetu
 from src.model_mindspore.utils import LearningRate
 from src.model_mindspore.parallel_transformer import ParallelConfig
 from src.tools.misc import parse_with_config, set_random_seed
+
 
 def init_env(opts):
     """ init_env """
@@ -87,14 +88,8 @@ def init_env(opts):
         context.reset_auto_parallel_context()
         context.set_auto_parallel_context(
             parallel_mode=context.ParallelMode.DATA_PARALLEL,
-            gradients_mean=False,
-            device_num=device_num,
-            full_batch=opts.full_batch,
-            enable_alltoall=True,
-            loss_repeated_mean=True,
-            enable_parallel_optimizer=False,
-            pipeline_stages=1,
-            strategy_ckpt_save_file=strategy_ckpt_save_file)
+            gradients_mean=True,
+            device_num=device_num)
     else:
         device_num = 1
     ds = create_dataset(opts, device_num=device_num,
@@ -118,18 +113,22 @@ def load_ckpt(net, ckpt_file):
     if not ckpt_file:
         return
     print(f"start loading ckpt:{ckpt_file}")
-    params_dict = load_checkpoint(ckpt_file)
-    if params_dict:
-        new_params_dict = {}
-        for key in params_dict.keys():
-            if key.find("txt_output.tfm_decoder") >= 0:
-                key_new = key[:22] + ".decoder.tfm_decoder" + key[22:]
-                new_params_dict[key_new] = params_dict[key]
-            new_params_dict[key] = params_dict[key]
-        new_params_dict["uniter.img_embeddings.img_linear.weight"] = new_params_dict["feat_regress.weight"]
-        new_params_dict["uniter.audio_embeddings.audio_linear.weight"] = new_params_dict["audio_feat_regress.weight"]
-        new_params_dict["uniter.embeddings.word_embeddings.embedding_table"] = new_params_dict["cls.predictions.decoder.weight"]
-        param_not_load = load_param_into_net(net, new_params_dict)
+    param_dict = load_checkpoint(ckpt_file)
+    if param_dict:
+        param_not_load = load_param_into_net(net, param_dict)
+        print("param not load:", param_not_load)
+    print(f"end loading ckpt:{ckpt_file}")
+
+def load_pretrain_ckpt(net, ckpt_file):
+    if not ckpt_file:
+        return
+    print(f"start loading ckpt:{ckpt_file}")
+    param_dict = load_checkpoint(ckpt_file)
+    if param_dict:
+        param_dict["uniter.img_embeddings.img_linear.weight"] = param_dict["feat_regress.weight"]
+        param_dict["uniter.audio_embeddings.audio_linear.weight"] = param_dict["audio_feat_regress.weight"]
+        param_dict["uniter.embeddings.word_embeddings.embedding_table"] = param_dict["cls.predictions.decoder.weight"]
+        param_not_load = load_param_into_net(net, param_dict)
         print("param not load:", param_not_load)
     print(f"end loading ckpt:{ckpt_file}")
 
@@ -137,10 +136,10 @@ def load_vit_ckpt(net, vit_ckpt_file):
     if not vit_ckpt_file:
         return
     print(f"start loading img-encoder:{vit_ckpt_file}")
-    vit_dict = load_checkpoint(vit_ckpt_file)
-    if vit_dict:
+    param_dict = load_checkpoint(vit_ckpt_file)
+    if param_dict:
         param_dict = {}
-        for k,v in vit_dict.items():
+        for k,v in param_dict.items():
             if k.startswith('encoder.'):        #vit 448
                 param_dict['uniter.img_embeddings.vit.' + k[8:]] = v
         param_not_load = load_param_into_net(net.uniter.img_embeddings.vit, param_dict)
@@ -161,6 +160,7 @@ def main(opts):
 
     load_ckpt(net_with_loss, opts.ckpt_file.strip())
     load_vit_ckpt(net_with_loss, opts.vit_ckpt_file.strip())
+    load_pretrain_ckpt(net_with_loss, opts.pretrain_ckpt_file.strip())
 
     if not opts.decay_steps:
         opts.decay_steps = opts.decay_epochs * dataset_size
@@ -212,14 +212,13 @@ def str2bool(b):
     return True
 
 if __name__ == "__main__":
-    project_root = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + os.path.sep + "..")
-    print('project root:', project_root)
     print('process id:', os.getpid())
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default="", help='JSON config files')
     parser.add_argument('--output_dir', default="", type=str, help='use audio out')
     parser.add_argument('--ckpt_file', default="", type=str, help='use txt out')
     parser.add_argument('--vit_ckpt_file', default="", type=str, help='use txt out')
+    parser.add_argument('--pretrain_ckpt_file', default="", type=str, help='use txt out')
     
     parser.add_argument("--start_learning_rate", default=1e-5, type=float,
                         help="The initial learning rate for Adam.")

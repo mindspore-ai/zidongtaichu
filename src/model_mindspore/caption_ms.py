@@ -47,14 +47,12 @@ class UniterThreeForPretrainingForCapFinetune(nn.Cell):
         self.uniter = UniterThreeModel(config, img_dim, audio_dim, use_video, parallel_config, use_moe)
 
         # Text Generator
-
         group_for_loss = 2
         fusion_group_backbone = parallel_config.fusion_group
         parallel_config.fusion_group = group_for_loss
         parallel_config.optimizer_shard = False
         fg_backbone = fusion_group_backbone // parallel_config.fusion_group
         self.txt_cfg = copy.deepcopy(cfg)
-        # self.txt_cfg = copy.deepcopy(cfg_base)
         self.txt_output = TransformerModel(self.txt_cfg, True, config.hidden_size, parallel_config, fg_backbone, False)
         self.td_crit = TransformerTrainingLoss(self.txt_cfg, parallel_config)
 
@@ -81,13 +79,9 @@ class UniterThreeForPretrainingForCapFinetune(nn.Cell):
                                          audio_feat=None, audio_pos_ids=None,
                                          audio_type_ids=None)
 
-         
-
         td_loss = self.generate_text(sequence_output, attention_mask, txt_gts, txt_masks)
 
         return td_loss
-
-
 
 class UniterThreeForPretrainingForCapFinetuneEval(nn.Cell):
     """ UNITER pretraining """
@@ -112,7 +106,6 @@ class UniterThreeForPretrainingForCapFinetuneEval(nn.Cell):
         self.uniter = UniterThreeModel(config, img_dim, audio_dim, use_video, parallel_config, use_moe)
 
         # Text Generator
-
         group_for_loss = 2
         fusion_group_backbone = parallel_config.fusion_group
         parallel_config.fusion_group = group_for_loss
@@ -122,7 +115,6 @@ class UniterThreeForPretrainingForCapFinetuneEval(nn.Cell):
         txt_cfg.batch_size = args.val_batch_size
         txt_cfg.beam_width = beam_width
         
-         
         self.txt_output = TransformerModel(txt_cfg, False, config.hidden_size, parallel_config, fg_backbone, False)
         self.td_crit = TransformerTrainingLoss(txt_cfg, parallel_config)
 
@@ -153,6 +145,58 @@ class UniterThreeForPretrainingForCapFinetuneEval(nn.Cell):
                                          audio_feat=None, audio_pos_ids=None,
                                          audio_type_ids=None)
          
+        return self.generate_text_eval(sequence_output, attention_mask)
 
-        td_loss = self.generate_text_eval(sequence_output, attention_mask)
-        return td_loss
+class UniterThreeForPretrainingForCapFinetuneInf(nn.Cell):
+    """ UNITER pretraining """
+
+    def __init__(self, config, img_dim, audio_dim,
+                 use_txt_out=False, use_video=False, full_batch=True, use_moe=False, args=None, beam_width=1):
+         
+        super(UniterThreeForPretrainingForCapFinetuneInf, self).__init__()
+        parallel_config = ParallelConfig()
+        self.use_txt_out = use_txt_out
+        self.use_video = use_video
+        if self.use_video:
+            img_dim = 1024
+         
+        config = UniterConfig.from_json_file(config)
+        config.full_batch = full_batch
+        config.use_vit = True 
+        config.use_patch = True
+        config.patch_size = 32
+        config.train_image_size=448
+        config.batch_size = 1
+        self.uniter = UniterThreeModel(config, img_dim, audio_dim, use_video, parallel_config, use_moe)
+
+        # Text Generator
+        group_for_loss = 2
+        fusion_group_backbone = parallel_config.fusion_group
+        parallel_config.fusion_group = group_for_loss
+        parallel_config.optimizer_shard = False
+        fg_backbone = fusion_group_backbone // parallel_config.fusion_group
+        txt_cfg = copy.deepcopy(cfg)
+        txt_cfg.batch_size = 1
+        txt_cfg.beam_width = beam_width
+        txt_cfg.max_decode_length = 50
+
+        self.txt_output = TransformerModel(txt_cfg, False, config.hidden_size, parallel_config, fg_backbone, False)
+        self.td_crit = TransformerTrainingLoss(txt_cfg, parallel_config)
+
+    def generate_text_eval(self, sequence_output, att_masks):
+        # generate text
+        return self.txt_output(sequence_output, att_masks)
+
+    def construct(self, img_feat, img_pos_feat, attention_mask, gather_index):
+        """
+        construct
+        """
+        sequence_output, _, _ = self.uniter(None, None,
+                                         img_feat, img_pos_feat,
+                                         attention_mask, gather_index,
+                                         output_all_encoded_layers=False,
+                                         txt_type_ids=None, img_type_ids=None,
+                                         audio_feat=None, audio_pos_ids=None,
+                                         audio_type_ids=None)
+         
+        return self.generate_text_eval(sequence_output, attention_mask)

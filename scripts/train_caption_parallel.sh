@@ -8,12 +8,13 @@ if [ $# != 3 ]
 then
     echo "Usage:
           bash scripts/train_caption_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]"
-exit 1
+    exit 1
 fi
 
 if [ $1 -lt 1 ] || [ $1 -gt 8 ]
 then
     echo "error: DEVICE_NUM=$1 is not in [1,8]"
+    exit 1
 fi
 
 VISIABLE_DEVICES=$2
@@ -27,7 +28,7 @@ fi
 if [ ! -f $3 ]
 then
     echo "error: RANK_TABLE_FILE=$3 is not a file"
-exit 1
+    exit 1
 fi
 
 export GLOG_v=3
@@ -58,9 +59,7 @@ do
     env > $output_dir/$task_name/rank_$i/env.log
     nohup python -u src/scripts/train_caption.py \
         --config=config/caption/$task_config_file \
-        --dataset_sink_mode=True \
-        --callback_size=-1 \
-        --ckpt_file=model/caption/OPT_1-38_136.ckpt \
+        --pretrain_ckpt_file=model/caption/OPT_1-38_136.ckpt \
         --output_dir=$output_dir/$task_name \
         --use_parallel=True \
         --data_url="a" --train_url="a" \
