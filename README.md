@@ -80,9 +80,9 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    <http://images.cocodataset.org/zips/val2014.zip> \
    将所有图片解压至datasets/caption/train/img/train2014/路径下
 
-   （可选）预训练模型下载: \
-   <https://ascend-mindspore-release.obs.cn-north-4.myhuaweicloud.com/OPT/OPT_1-38_136.ckpt> \
-   解压至model/caption/路径下并在启动脚本添加ckpt_file参数
+   预训练模型下载: \
+   <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
+   解压至model/caption/路径下
 
    启动训练：\
    bash scripts/train_caption.sh
@@ -129,7 +129,7 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    下载后运行python src/tools/vqa/prepare_vqa_tokens.py 提取vqa问题和答案的token，将得到的文件放到dataset/vqa/路径下
 
   （可选）预训练模型下载: \
-   <https://ascend-mindspore-release.obs.cn-north-4.myhuaweicloud.com/OPT/OPT_1-38_136.ckpt> \
+   <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
    解压至model/vqa/路径下并在启动脚本添加ckpt_file参数
 
    启动训练：\
@@ -157,8 +157,8 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    解压至datasets/retrieval/路径下
 
    预训练模型下载: \
-   <https://ascend-mindspore-release.obs.cn-north-4.myhuaweicloud.com/OPT/OPT_1-38_136.ckpt> \
-   解压至model/retrieval/路径下并在启动脚本修改pretrain_ckpt_file为实际文件名
+   <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
+   解压至model/retrieval/路径下
 
    启动训练：\
    bash scripts/train_retrieval.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]
