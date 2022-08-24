@@ -1,7 +1,7 @@
 #!/bin/bash
 
 output_dir="output/vqa"
-task_name="finetune_vqa_parallel"
+task_name="finetune_vqa"
 task_config_file="ft_vqa_base.json"
 
 if [ $# != 3 ]
@@ -59,6 +59,7 @@ do
     nohup python -u src/scripts/train_vqa.py \
         --config=config/vqa/$task_config_file \
         --output_dir=$output_dir/$task_name \
+        --ckpt_file=model/vqa/OPT_1-38_136.ckpt \
         --use_parallel=True \
         --data_url="a" --train_url="a" --mode="train" \
         > $output_dir/$task_name/rank_$i/log_train 2>&1 &
