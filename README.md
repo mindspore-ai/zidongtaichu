@@ -85,7 +85,8 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    解压至model/caption/路径下
 
    启动训练：\
-   bash scripts/train_caption.sh
+   bash scripts/train_caption_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]
+   （各项参数说明参考Mindspore官方文档）
 
    启动测试（需安装java1.8.0）：\
    bash scripts/test_caption.sh
@@ -133,7 +134,8 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    解压至model/vqa/路径下并在启动脚本添加ckpt_file参数
 
    启动训练：\
-   bash scripts/train_vqa.sh
+   bash scripts/train_vqa_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]
+   （各项参数说明参考Mindspore官方文档）
 
    启动测试（需安装java1.8.0）：\
    bash scripts/test_vqa.sh
@@ -161,7 +163,7 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    解压至model/retrieval/路径下
 
    启动训练：\
-   bash scripts/train_retrieval.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]
+   bash scripts/train_retrieval_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]
    （各项参数说明参考Mindspore官方文档）
 
    启动测试（将test_retrieval.sh中的ckpt模型路径更换成自己训练的）：\
