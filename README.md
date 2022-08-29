@@ -73,18 +73,21 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    数据集下载：\
    百度云盘链接：<https://pan.baidu.com/s/1ECN5JXlRPQsBS8O763Y8pA>\
    提取码：84me\
-   解压至datasets/caption/路径下
+   解压至dataset/caption/路径下
 
    coco图片下载\
    <http://images.cocodataset.org/zips/train2014.zip>\
    <http://images.cocodataset.org/zips/val2014.zip> \
-   将所有图片解压至datasets/caption/train/img/train2014/路径下
+   将所有图片解压至dataset/caption/train/img/train2014/路径下
 
    预训练模型下载: \
    <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
    解压至model/caption/路径下
 
-   启动训练：\
+   启动训练： \
+   单卡： \
+   bash scripts/train_caption.sh \
+   多卡： \
    bash scripts/train_caption_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]
    （各项参数说明参考Mindspore官方文档）
 
@@ -118,22 +121,25 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 
    VQA数据集\
     <http://research.baidu.com/Public/uploads/5ac9e10bdd572.gz> \
-   下载后将文件解压并重命名为FM-IQA.json，移动至datasets/vqa/txt/路径下
+   下载后将文件解压并重命名为FM-IQA.json，移动至dataset/vqa/txt/路径下
 
    coco图片\
    <http://images.cocodataset.org/zips/train2014.zip>\
    <http://images.cocodataset.org/zips/val2014.zip> \
-   解压至datasets/vqa/img/mscoco/路径下
+   解压至dataset/vqa/img/mscoco/路径下
 
    词表\
    链接：<https://pan.baidu.com/s/14FrOW7LMAwwDK5gfDS1BeA> 提取码：j50u \
    下载后运行python src/tools/vqa/prepare_vqa_tokens.py 提取vqa问题和答案的token，将得到的文件放到dataset/vqa/路径下
 
-  （可选）预训练模型下载: \
+  预训练模型下载: \
    <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
    解压至model/vqa/路径下并在启动脚本添加ckpt_file参数
 
    启动训练：\
+   单卡： \
+   bash scripts/train_vqa.sh \
+   多卡： \
    bash scripts/train_vqa_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]
    （各项参数说明参考Mindspore官方文档）
 
@@ -156,7 +162,7 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 
    数据集下载：\
    链接：<https://pan.baidu.com/s/1lArnJlPfkahcn5IZlgwJvQ> 提取码：fdc8 \
-   解压至datasets/retrieval/路径下
+   解压至dataset/retrieval/路径下
 
    预训练模型下载: \
    <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
@@ -195,7 +201,7 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 
    数据集下载：\
    链接：<https://pan.baidu.com/s/1dt04CmP5v_EL_dUq8S8SVA> 提取码：o8ja \
-   解压至datasets/speech/路径下
+   解压至dataset/speech/路径下
 
    启动训练：\
    bash scripts/train_speech.sh

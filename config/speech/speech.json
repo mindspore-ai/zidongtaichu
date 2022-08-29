@@ -30,24 +30,24 @@
   "pin_mem": true,
   "image_size":448,
   "patch_size":32,
-  "ids_train_path": "datasets/speech/data/train_aishell3.json",
-  "vocab_path": "datasets/speech/data/ids_to_tokens_zh.json",
+  "ids_train_path": "dataset/speech/data/train_aishell3.json",
+  "vocab_path": "dataset/speech/data/ids_to_tokens_zh.json",
   "use_validate": false,
   "show_time": true,
   "audio_preprocess_config": "src/fastspeech2_mindspore/config/AISHELL3/preprocess.yaml",
   "audio_model_config": "src/fastspeech2_mindspore/config/AISHELL3/model.yaml",
-  "audio_mel_path": "datasets/speech",
+  "audio_mel_path": "dataset/speech",
   "train_datasets": [
     {
       "name": "open",
       "db": [
-        "datasets/speech/data"
+        "dataset/speech/data"
       ],
       "img": [
-        "datasets/speech/img"
+        "dataset/speech/img"
       ],
       "audio": [
-        "datasets/speech/audio"
+        "dataset/speech/audio"
       ],
       "tasks": [
         "adText"
@@ -57,18 +57,18 @@
       ]
     }
   ],
-  "ids_val_path": "datasets/speech/data/val_aishell3.json",
+  "ids_val_path": "dataset/speech/data/val_aishell3.json",
   "val_datasets": [
     {
       "name": "open",
       "db": [
-        "datasets/speech/data"
+        "dataset/speech/data"
       ],
       "img": [
-        "datasets/speech/img"
+        "dataset/speech/img"
       ],
       "audio": [
-        "datasets/speech/audio"
+        "dataset/speech/audio"
       ],
       "tasks": [
         "adTextEval"
