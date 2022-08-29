@@ -78,11 +78,11 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    coco图片下载\
    <http://images.cocodataset.org/zips/train2014.zip>\
    <http://images.cocodataset.org/zips/val2014.zip> \
-   将所有图片解压至dataset/caption/train/img/train2014/路径下
+   解压至dataset/caption/img/mscoco/路径下
 
    预训练模型下载: \
    <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
-   解压至model/caption/路径下
+   下载至model/caption/路径下
 
    启动训练： \
    单卡： \
@@ -134,7 +134,7 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 
   预训练模型下载: \
    <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
-   解压至model/vqa/路径下并在启动脚本添加ckpt_file参数
+   下载至model/vqa/路径下
 
    启动训练：\
    单卡： \
@@ -166,7 +166,7 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 
    预训练模型下载: \
    <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
-   解压至model/retrieval/路径下
+   下载至model/retrieval/路径下
 
    启动训练：\
    bash scripts/train_retrieval_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]
