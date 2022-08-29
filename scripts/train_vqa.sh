@@ -14,6 +14,7 @@ export RANK_SIZE=1;export DEVICE_ID=$device_id;export MS_COMPILER_CACHE_PATH=${o
 nohup python -u src/scripts/train_vqa.py \
     --config=config/vqa/$task_config_file \
     --output_dir=$output_dir/$task_name \
+    --ckpt_file=model/vqa/OPT_1-38_136.ckpt \
     --use_parallel=False \
     --data_url="a" --train_url="a" --mode="train" \
     > $output_dir/$task_name/log_train 2>&1 &

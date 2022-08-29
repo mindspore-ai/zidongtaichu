@@ -165,6 +165,8 @@ def main(opts):
     load_ckpt(net_with_loss, opts.ckpt_file.strip())
     load_vit_ckpt(net_with_loss, opts.vit_ckpt_file.strip())
     
+    if not opts.decay_steps:
+        opts.decay_steps = opts.decay_epochs * dataset_size
     lr = LearningRate(opts.start_learning_rate, opts.end_learning_rate, opts.warmup_steps, opts.decay_steps)
     optimizer = build_optimizer(net_with_loss, opts, lr)
 
@@ -214,15 +216,16 @@ if __name__ == "__main__":
     parser.add_argument('--vit_ckpt_file', default="", type=str)
     parser.add_argument('--ckpt_file', default="", type=str)
     
-    parser.add_argument("--start_learning_rate", default=5e-5, type=float,
+    parser.add_argument("--start_learning_rate", default=1e-5, type=float,
                         help="The initial learning rate for Adam.")
     parser.add_argument("--end_learning_rate", default=1e-7, type=float,
                         help="The end learning rate for Adam.")
-    parser.add_argument("--decay_steps", default=120000, type=int,
-                        help="The decay step.")
+    parser.add_argument("--decay_steps", default=0, type=int,
+                        help="lr decay steps.")
+    parser.add_argument("--decay_epochs", default=10, type=int, help="lr decay epochs.")
     parser.add_argument("--train_batch_size", default=10, type=int,
                         help="The decay step.")
-    parser.add_argument("--epochs", default=50, type=int,
+    parser.add_argument("--epochs", default=10, type=int,
                         help="The decay step.")
     
     parser.add_argument('--callback_size', default=100, type=int, help='callback size.')
