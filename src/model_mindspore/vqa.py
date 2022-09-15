@@ -80,6 +80,56 @@ class UniterThreeForPretrainingForVQAFinetuneEval(nn.Cell):
         ans = self.generate_text_eval(sequence_output, attention_mask)
         return ans
 
+class UniterThreeForPretrainingForVQAFinetuneInf(nn.Cell):
+    """ UNITER pretraining """
+
+    def __init__(self, config, img_dim, img_label_dim, audio_dim, audio_label_dim,
+                 use_txt_out=False, use_video=False, full_batch=True, use_moe=False, is_parallel=True, args=None, beam_width=1):
+        super(UniterThreeForPretrainingForVQAFinetuneInf, self).__init__()
+
+        parallel_config = ParallelConfig()
+        self.use_txt_out = use_txt_out
+        self.use_video = use_video
+        if self.use_video:
+            img_dim = 1024
+        config = UniterConfig.from_json_file(config)
+        config.full_batch = full_batch
+        config.batch_size = 1
+        self.uniter = UniterThreeModel(config, img_dim, audio_dim, use_video, parallel_config, use_moe, is_parallel)
+
+        #Text Generator
+        group_for_loss = 2
+        fusion_group_backbone = parallel_config.fusion_group
+        parallel_config.fusion_group = group_for_loss
+        parallel_config.optimizer_shard = False
+        fg_backbone = fusion_group_backbone // parallel_config.fusion_group
+        txt_cfg = copy.deepcopy(cfg)
+        txt_cfg.batch_size = 1
+        txt_cfg.beam_width = beam_width
+        self.txt_output = TransformerModel(txt_cfg, False, config.hidden_size, parallel_config, fg_backbone, False)
+
+    def generate_text_eval(self, sequence_output, att_masks):
+        # generate text
+        txt_out = self.txt_output(sequence_output, att_masks)
+        return txt_out
+
+    def construct(self, input_ids, position_ids, img_feat, img_pos_feat,
+                  attention_mask, gather_index):
+        """
+        construct
+        """
+        sequence_output, _, _ = self.uniter(input_ids, position_ids,
+                                          img_feat, img_pos_feat,
+                                          attention_mask, gather_index, img_masks=None,
+                                          output_all_encoded_layers=False,
+                                          txt_type_ids=None, img_type_ids=None,
+                                          audio_feat=None, audio_pos_ids=None,
+                                          audio_type_ids=None, audio_masks=None,
+                                          images=None)
+
+        ans = self.generate_text_eval(sequence_output, attention_mask)
+        return ans
+
 
 class UniterThreeForPretrainingForVQAFinetune(UniterThreeForPretrainingWithLoss):
     """ UNITER VQAGEN FINETUNE """
