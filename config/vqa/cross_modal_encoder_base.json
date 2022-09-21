@@ -27,5 +27,6 @@
   "use_vit": true,
   "train_image_size": 448,
   "patch_size": 32,
+  "vit_num_heads": 12,
   "vit_type": 0
 }

@@ -3,12 +3,13 @@
 output_dir="output/retrieval"
 task_name="finetune_retrieval"
 task_config_file="ft_ret_1b.json"
-pretrain_ckpt_file="OPT_1-38_136.ckpt"
+ckpt_name="3_25635"
+ckpt_file="OPT_ret-$ckpt_name.ckpt"
 
 if [ $# != 3 ]
 then
     echo "Usage:
-          bash scripts/train_retrieval_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]"
+          bash scripts/eval_retrieval_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]"
 exit 1
 fi
 
@@ -45,7 +46,6 @@ RANK_TABLE_FILE=$(realpath $3)
 export RANK_TABLE_FILE
 echo "RANK_TABLE_FILE=${RANK_TABLE_FILE}"
 
-rm -rf ${output_dir:?}/${task_name:?}
 mkdir -p ${output_dir:?}/${task_name:?}
 export MS_COMPILER_CACHE_PATH=${output_dir:?}/${task_name:?}
 export SERVER_ID=0
@@ -57,10 +57,10 @@ do
     mkdir -p ${output_dir:?}/${task_name:?}/rank_$i
     echo "start training for rank $RANK_ID, device $DEVICE_ID"
     env > env.log
-    nohup python -u src/scripts/train_retrieval.py \
+    nohup python -u src/scripts/eval_retrieval.py \
         --config=config/retrieval/$task_config_file \
         --output_dir=$output_dir/$task_name \
-        --pretrain_ckpt_file=model/retrieval/$pretrain_ckpt_file \
-        --use_parallel="true" \
-        > $output_dir/$task_name/rank_$i/log_train 2>&1 &
+        --ckpt_file=$output_dir/$task_name/ckpt/rank_0/$ckpt_file \
+        --use_parallel=True \
+        > $output_dir/$task_name/rank_$i/log_eval 2>&1 &
 done

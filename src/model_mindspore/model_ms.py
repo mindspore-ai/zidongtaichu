@@ -225,10 +225,10 @@ class UniterImageEmbeddings(nn.Cell):
             
             self.vit_type = getattr(config, 'vit_type', 0)
             if self.vit_type == 0:
-                vit_model = VitEval(batch_size=config.batch_size,
+                vit_model = VitEval(batch_size=config.batch_size, encoder_num_heads=config.vit_num_heads,
                                     patch_size=config.patch_size, image_size=config.train_image_size)
             elif self.vit_type == 1:
-                vit_model = VitEvalV2(batch_size=config.batch_size,
+                vit_model = VitEvalV2(batch_size=config.batch_size, encoder_num_heads=config.vit_num_heads,
                                     patch_size=config.patch_size, image_size=config.train_image_size)
             else:
                 raise Exception("Error Vit Type")

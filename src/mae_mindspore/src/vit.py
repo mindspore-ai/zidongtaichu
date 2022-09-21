@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+from xml.etree.ElementPath import ops
 import numpy as np
 
 from mindspore import nn
@@ -24,7 +25,7 @@ from mindspore.parallel.nn import TransformerEncoder
 from mindspore.train.serialization import load_param_into_net
 from mindspore.common.initializer import initializer, XavierUniform
 from mindspore.nn.transformer import TransformerOpParallelConfig
-from src.model_mindspore.parallel_transformer import ParallelConfig
+from src.model_mindspore.parallel_transformer import ParallelConfig, LayerNorm
 
 from .modules import VitStem, PatchEmbed
 from .mae_vit import MAEModule
@@ -128,7 +129,6 @@ class VitEval(MAEModule):
             initializer(initialization, (1, seq_length, encoder_dim)),
             name='pos_embedding', requires_grad=True
         )
-
         parallel_config = ParallelConfig
         op_parallel_config = TransformerOpParallelConfig(data_parallel=parallel_config.dp,
                                                          model_parallel=parallel_config.mp,
@@ -141,10 +141,11 @@ class VitEval(MAEModule):
                                           ffn_hidden_size=encoder_dim * mlp_ratio, seq_length=seq_length,
                                           parallel_config=op_parallel_config)
 
-        self.add = P.Add()
+        self.add = P.Add().shard(((parallel_config.dp, 1, 1), (1, 1, 1)))
         self.cast = P.Cast()
-        self.cat = P.Concat(axis=1)
-        self.norm = nn.LayerNorm((encoder_dim,), epsilon=1e-5)
+        self.cat = P.Concat(axis=1).shard(((parallel_config.dp, 1, 1),
+                                           (parallel_config.dp, 1, 1)))
+        self.norm = LayerNorm((encoder_dim,), parallel_config.dp)
         # self.head = nn.Dense(encoder_dim, num_classes)
         # self.head.weight.set_data(initializer(initialization, [num_classes, encoder_dim]))
         self.stem = VitStem(encoder_dim, patch_size, image_size)
@@ -152,9 +153,11 @@ class VitEval(MAEModule):
         if dropout:
             self.is_dropout = True
             self.dropout = nn.Dropout(keep_prob=(1. - dropout))
+            self.dropout.dropout.shard(((parallel_config.dp, 1, 1),))
         print("vit seq_length ===========>", batch_size, seq_length)
         self.encoder_input_mask = Tensor(np.ones((batch_size, seq_length, seq_length)),
                                          mstype.float16)
+        self.print = P.Print()
 
     def init_weights(self, param_dict):
         """Full model weights initialization."""
@@ -162,7 +165,6 @@ class VitEval(MAEModule):
         return net_not_load
 
     def construct(self, img):
-
         tokens, _ = self.stem(img)
         # tokens = self.cat((self.cls_token, tokens))
         tokens = self.add(tokens, self.encoder_pos_embedding)

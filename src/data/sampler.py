@@ -23,9 +23,16 @@ class EasySampler:
         Sampler for token bucket path
     """
 
-    def __init__(self, dataset, batch_size, device_num=1):
+    def __init__(self, dataset, batch_size, device_num=1, full_batch=False):
         self.dataset = dataset
-        self.per_batch = batch_size * device_num
+        self.full_batch = full_batch
+
+        if full_batch:
+            self.per_batch = batch_size
+        else:
+            self.per_batch = batch_size * device_num
+
+        print(f"per_batch => {self.per_batch}")
 
     def _create_ids(self):
         return list(range(len(self.dataset)))
@@ -46,9 +53,16 @@ class BatchSampler:
         Batch Sampler
     """
 
-    def __init__(self, lens, batch_size, device_num):
+    def __init__(self, lens, batch_size, device_num, full_batch=False):
         self._lens = lens
-        self._batch_size = batch_size * device_num
+        self.full_batch = full_batch
+
+        if full_batch:
+            self._batch_size = batch_size
+        else:
+            self._batch_size = batch_size * device_num
+        
+        print(f"batch_size => {self._batch_size}")
 
     def _create_ids(self):
         return list(range(self._lens))

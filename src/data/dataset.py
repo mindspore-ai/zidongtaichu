@@ -92,16 +92,20 @@ def create_dataset(opts, device_num=1,
     """
     set_random_seed(opts.seed)
     if is_train:
-        train_data_loaders, datalen = create_three_dataloaders(opts.ids_train_path, opts.train_datasets, is_train,
+        data_loaders, datalen = create_three_dataloaders(opts.ids_train_path, opts.train_datasets, is_train,
                                                       opts, device_num=device_num)
         batch_size = opts.train_batch_size
     else:
-        train_data_loaders, datalen = create_three_dataloaders(opts.ids_val_path, opts.val_datasets, is_train,
+        data_loaders, datalen = create_three_dataloaders(opts.ids_val_path, opts.val_datasets, is_train,
                                                       opts, device_num=device_num)
         batch_size = opts.val_batch_size
 
-    datalen = datalen // (batch_size * device_num)
-    metaloader = MetaLoader(train_data_loaders, datalen=datalen, task_num=len(train_data_loaders.keys()))
+    if opts.full_batch:
+        datalen = datalen // batch_size
+    else:
+        datalen = datalen // (batch_size * device_num)
+
+    metaloader = MetaLoader(data_loaders, datalen=datalen, task_num=len(data_loaders.keys()))
 
     dataset = GeneratorDataset(metaloader, column_names=data_column, shuffle=False)
 

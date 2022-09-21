@@ -23,10 +23,8 @@ import mindspore as ms
 from mindspore import context, ops
 from mindspore.train.model import Model
 from mindspore.common.tensor import Tensor
-from mindspore.train.callback import LossMonitor, TimeMonitor, CheckpointConfig, ModelCheckpoint, SummaryCollector
 from mindspore.communication.management import init, get_group_size, get_rank
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
-from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from mindspore.nn.learning_rate_schedule import LearningRateSchedule, PolynomialDecayLR, WarmUpLR, CosineDecayLR
 from mindspore.ops import operations as P
 import mindspore.common.dtype as mstype
@@ -37,10 +35,7 @@ from src.config.config import *
 from src.data import create_dataset, get_batch_data
 from src.data.utils import pad_sequence
 from src.model_mindspore.parallel_transformer import ParallelConfig
-from src.model_mindspore.cell_wrapper import ParallelTrainOneStepWithLossScaleCell
-from src.model_mindspore.retrieval_ms import UniterThreeForPretrainingForRetFinetune, \
-                                    UniterThreeForPretrainingForRetFinetuneEval
-from src.model_mindspore.optim_ms import build_optimizer
+from src.model_mindspore.retrieval_ms import UniterThreeForPretrainingForRetFinetuneEval
 from src.tools.misc import parse_with_config, set_random_seed
 
 def init_env(opts):
@@ -123,21 +118,11 @@ def init_env(opts):
 
     # init dataset
     ds = create_dataset(opts, device_num=device_num,
-                        token_size=opts.train_batch_size, is_train=True)
+                        token_size=opts.val_batch_size, is_train=False)
     dataset_size = ds.get_dataset_size()
     print("=====dataset size: ", dataset_size, flush=True)
-    if opts.dataset_sink_mode:
-        if opts.callback_size > 0:
-            new_epoch = opts.epochs * dataset_size // opts.callback_size
-            callback_size = opts.callback_size
-        else:
-            new_epoch = opts.epochs
-            callback_size = dataset_size
-    else:
-        new_epoch = opts.epochs
-        callback_size = opts.callback_size
 
-    return local_rank, rank_id, callback_size, new_epoch, ds, dataset_size
+    return rank_id, ds
 
 def load_ckpt(net, ckpt_file):
     if not ckpt_file:
@@ -164,11 +149,25 @@ def load_pretrain_ckpt(net, ckpt_file):
         print("==========param not load==========:", param_not_load)
         print('load pretrain ckpt finished:', ckpt_file)
 
+def create_fake_input(batch_size):
+    input_ids = Tensor(np.array(np.random.randint(VOCAB_SIZE, size=(batch_size, MAX_FULL_TEXT_LEN)), dtype=np.int32), ms.int32)
+    position_ids = Tensor(np.expand_dims(np.arange(0, MAX_FULL_TEXT_LEN, dtype=np.int32), axis=0), ms.int32)
+    img_feat = Tensor(np.random.rand(batch_size, MAX_IMG_LEN, PATCH_SIZE ** 2 * 3), ms.float32)
+    img_pos_feat = Tensor(np.expand_dims(np.arange(0, MAX_IMG_LEN, dtype=np.int32), axis=0), ms.int32)
+    audio_feat = Tensor(np.zeros((batch_size, MAX_AUDIO_LEN, AUDIO_DIM), dtype=np.float32), ms.float32)
+    audio_pos_ids = Tensor(np.zeros((1, MAX_AUDIO_LEN), dtype=np.int32), ms.int32)
+    attention_mask = Tensor(pad_sequence(np.ones((batch_size, MAX_IMG_TEXT_LEN), dtype=np.int32), batch_first=True, padding_value=0, max_lens=MAX_FULL_LEN), ms.int32)
+    gather_index = Tensor(np.repeat(np.expand_dims(np.arange(0, MAX_FULL_LEN, dtype=np.int32), axis=0), batch_size, axis=0), ms.int32)
+    img_masks = Tensor(np.zeros((batch_size, MAX_IMG_LEN), dtype=np.bool_), ms.bool_)
+    
+    return (input_ids, position_ids, img_feat, img_pos_feat, audio_feat, audio_pos_ids,
+                  attention_mask, gather_index, img_masks)
+
 def load_distributed_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name):
-    ckpt_id = rank_id % ckpt_size
-    folder = "rank_" + str(ckpt_id)
     if not ckpt_path or not ckpt_name:
         return
+    ckpt_id = rank_id % ckpt_size
+    folder = "rank_" + str(ckpt_id)
     ckpt_file = os.path.join(ckpt_path, folder, ckpt_name)
     if not os.path.exists(ckpt_file):
         print(f"ckpt_file:{ckpt_file} does not exists")
@@ -181,10 +180,10 @@ def load_distributed_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name):
         print('load distributed ckpt finished:', ckpt_file)
 
 def load_distributed_pretrain_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name):
-    ckpt_id = rank_id % ckpt_size
-    folder = "rank_" + str(ckpt_id)
     if not ckpt_path or not ckpt_name:
         return
+    ckpt_id = rank_id % ckpt_size
+    folder = "rank_" + str(ckpt_id)
     ckpt_file = os.path.join(ckpt_path, folder, ckpt_name)
     if not os.path.exists(ckpt_file):
         print(f"ckpt_file:{ckpt_file} does not exists")
@@ -238,69 +237,93 @@ class LearningRate(LearningRateSchedule):
             lr = decay_lr
         return lr
 
+
+def guard_val(val):
+    """ guard_val """
+    if val is None:
+        return Tensor(0).astype(ms.int32)
+    return val
+
+
 def main(opts):
     # init
-    (local_rank, rank_id, callback_size, new_epoch, ds, dataset_size) = init_env(opts)
+    (rank_id, ds) = init_env(opts)
+    # eval
+    net_without_loss = UniterThreeForPretrainingForRetFinetuneEval(opts.model_config, img_dim=IMG_DIM,
+                                                                    img_label_dim=IMG_LABEL_DIM,
+                                                                    audio_dim=AUDIO_DIM, audio_label_dim=AUDIO_LABEL_DIM,
+                                                                    use_txt_out=opts.use_txt_out, use_video=opts.use_video,
+                                                                    full_batch=opts.full_batch, use_moe=opts.use_moe,
+                                                                    args=opts, is_parallel=opts.use_parallel)
 
-    # create model
-    net_with_loss = UniterThreeForPretrainingForRetFinetune(opts.model_config, img_dim=IMG_DIM,
-                                                            img_label_dim=IMG_LABEL_DIM,
-                                                            audio_dim=AUDIO_DIM, audio_label_dim=AUDIO_LABEL_DIM,
-                                                            use_txt_out=opts.use_txt_out, use_video=opts.use_video,
-                                                            full_batch=opts.full_batch, use_moe=opts.use_moe,
-                                                            args=opts, is_parallel=opts.use_parallel)
+    model = Model(net_without_loss)
 
-    # learning rate and optimizer
-    lr = LearningRate(opts.start_learning_rate, opts.end_learning_rate, opts.warmup_steps, opts.decay_steps)
-    optimizer = build_optimizer(net_with_loss, opts, lr)
-    update_cell = DynamicLossScaleUpdateCell(loss_scale_value=opts.init_loss_scale,
-                                             scale_factor=opts.loss_scale_factor,
-                                             scale_window=opts.scale_window)
-
-    # build net with grads
-    net_with_grads = ParallelTrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer,
-                                                           scale_sense=update_cell, parallel_config=ParallelConfig)
-
-    # set callbacks
-    callback = [TimeMonitor(callback_size), LossMonitor(callback_size)]
-    
-    # path to save ckpt
-    if not opts.save_checkpoint_steps:
-        opts.save_checkpoint_steps = dataset_size
-    ckpt_dir = os.path.join(opts.output_dir, "ckpt", f"rank_{str(local_rank)}")
-    if not os.path.exists(ckpt_dir):
-        Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
-    
-    # set checkpoint callback
-    config_ck = CheckpointConfig(save_checkpoint_steps=opts.save_checkpoint_steps,
-                                    keep_checkpoint_max=1,
-                                    integrated_save=False)
-    ckpoint_cb = ModelCheckpoint(prefix="OPT_ret",
-                                    directory=ckpt_dir,
-                                    config=config_ck)
-    callback.append(ckpoint_cb)
-    
-    # modify summary callback
-    if opts.save_summary:
-        specified = {"collect_metric": True, "collect_graph": True, "collect_dataset_graph": True}
-        summary_collector = SummaryCollector(summary_dir=os.path.join(opts.output_dir, 'summary'), 
-        collect_specified_data=specified, collect_freq=1, keep_default_action=False, collect_tensor_freq=200)
-        callback.append(summary_collector)
-    
-    # build model
-    model = Model(net_with_grads)
-    if opts.dataset_sink_mode:
-        print("start building...")
-        model.build(train_dataset=ds, sink_size=callback_size, epoch=new_epoch)
+    (input_ids, position_ids, img_feat, img_pos_feat, audio_feat, audio_pos_ids, attention_mask, gather_index, img_masks) = \
+    create_fake_input(opts.val_batch_size)
+    model.predict(input_ids, position_ids, img_feat, img_pos_feat, audio_feat, audio_pos_ids, attention_mask, gather_index, img_masks) 
     
     # load ckpt
-    load_ckpt(net_with_loss, opts.ckpt_file)
-    load_pretrain_ckpt(net_with_loss, opts.pretrain_ckpt_file)
-    load_distributed_ckpt(net_with_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.ckpt_name)
-    load_distributed_pretrain_ckpt(net_with_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.pretrain_ckpt_name)
+    load_ckpt(net_without_loss, opts.ckpt_file)
+    load_pretrain_ckpt(net_without_loss, opts.pretrain_ckpt_file)
+    load_distributed_ckpt(net_without_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.ckpt_name)
+    load_distributed_pretrain_ckpt(net_without_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.pretrain_ckpt_name)
+    
+    ids = json.load(open(opts.ids_val_path,'r'))
+    print("retrieval dataset's length is: ", len(ids))
+    log = validate_itm_matching(model, ds, len(ids), is_parallel=opts.use_parallel)
+    print(log)
 
-    print("start training...")
-    model.train(new_epoch, ds, callbacks=callback, dataset_sink_mode=opts.dataset_sink_mode, sink_size=callback_size)
+def validate_itm_matching(model, val_ds, pair_num=1000, is_parallel = True):
+    topk = ops.TopK()
+    print("start running ITM validation...")
+    score_vec = Tensor(np.zeros((pair_num ** 2,)), ms.float32)
+    n_ex = 0
+    for batch in val_ds.create_dict_iterator():
+        (input_ids, position_ids, img_feat, img_pos_feat, audio_feat,
+            audio_pos_ids, attention_mask, gather_index, _, _,
+            _, _, _, img_masks, _, _, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _,_) = get_batch_data(batch)
+        scores = model.predict(input_ids, position_ids, img_feat, img_pos_feat, audio_feat, audio_pos_ids,
+                  attention_mask, gather_index, img_masks)
+        bs = scores.shape[0]
+        score_vec[n_ex:n_ex + bs] = scores[:,0]
+        n_ex += bs
+        print(f"{n_ex}/{pair_num ** 2}")
+        if n_ex >= pair_num ** 2:
+            break
+
+    if not is_parallel or get_rank()==0:
+        score_vec = score_vec[:n_ex]
+        k = 10
+        score_mat = score_vec.reshape((int(math.sqrt(n_ex)), -1))
+
+        max_targets = np.arange(0, int(math.sqrt(n_ex)), dtype=np.int64)
+        values, topk_indices = topk(score_mat, 10)
+        topk_ind = topk_indices.asnumpy()
+        gt_img_j = np.expand_dims(max_targets, 1).repeat(k, axis=1)
+        _, rank = np.nonzero(topk_ind == gt_img_j)
+        tr_r1 = (rank < 1).sum().item() / int(math.sqrt(n_ex))
+        tr_r5 = (rank < 5).sum().item() / int(math.sqrt(n_ex))
+        tr_r10 = (rank < 10).sum().item() / int(math.sqrt(n_ex))
+
+        score_mat = score_mat.T
+        values, topk_indices = topk(score_mat, 10)
+        topk_ind = topk_indices.asnumpy()
+        gt_img_j = np.expand_dims(max_targets, 1).repeat(k, axis=1)
+        _, rank = np.nonzero(topk_ind == gt_img_j)
+        ir_r1 = (rank < 1).sum().item() / int(math.sqrt(n_ex))
+        ir_r5 = (rank < 5).sum().item() / int(math.sqrt(n_ex))
+        ir_r10 = (rank < 10).sum().item() / int(math.sqrt(n_ex))
+
+        ret_logs = {}
+        ret_logs["ir_r1"] = ir_r1
+        ret_logs["ir_r5"] = ir_r5
+        ret_logs["ir_r10"] = ir_r10
+        ret_logs["tr_r1"] = tr_r1
+        ret_logs["tr_r5"] = tr_r5
+        ret_logs["tr_r10"] = tr_r10
+        return ret_logs
+    return None
 
 def str2bool(b):
     if b.lower() in ["false"]:
@@ -314,15 +337,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default="", help='JSON config files')
     parser.add_argument('--output_dir', default="", type=str, help='output directory')
-    parser.add_argument('--callback_size', default=100, type=int, help='callback size.')
-    parser.add_argument('--dataset_sink_mode', default=False, type=str2bool, help='dataset sink mode')
-    parser.add_argument('--save_summary', default=False, type=str2bool, help='save summary')
-    parser.add_argument("--start_learning_rate", default=2.5e-5, type=float,
-                        help="The initial learning rate for Adam.")
-    parser.add_argument("--end_learning_rate", default=1e-8, type=float,
-                        help="The end learning rate for Adam.")
-    parser.add_argument("--decay_steps", default=20000, type=int,
-                        help="The decay step.")
     parser.add_argument('--use_txt_out', default=False,
                         type=str2bool, help='use txt out')
     parser.add_argument('--use_video', default=False,

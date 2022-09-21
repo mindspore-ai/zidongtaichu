@@ -20,7 +20,7 @@ import os
 class DataLoader:
     """ DataLoader """
 
-    def __init__(self, dataset, batch_sampler, collate_fn, is_train=True, device_num=256, drop_last=True):
+    def __init__(self, dataset, batch_sampler, collate_fn, is_train=True, device_num=256, drop_last=True, full_batch=False):
         self.dataset = dataset
         self.batch_sampler = batch_sampler
         self.collat_fn = collate_fn
@@ -30,6 +30,7 @@ class DataLoader:
         self.is_train = is_train
         self.drop_last = drop_last
         self.batch_size = len(next(iter(self.batch_sampler)))
+        self.full_batch = full_batch
 
     def __iter__(self):
         self.step_index = 0
@@ -49,8 +50,11 @@ class DataLoader:
                 indices = next(self.batch_indices)
                 print("Run out of data, start another epoch", flush=True)
             data = []
-            per_batch = len(indices) // self.device_num
-            index = indices[self.rank_id * per_batch:(self.rank_id + 1) * per_batch]
+            if self.full_batch:
+                index = indices
+            else:
+                per_batch = len(indices) // self.device_num
+                index = indices[self.rank_id * per_batch:(self.rank_id + 1) * per_batch]          
             for idx in index:
                 data.append(self.dataset[idx])
 
@@ -60,8 +64,11 @@ class DataLoader:
         else:
             indices = next(self.batch_indices)
             data = []
-            per_batch = len(indices) // self.device_num
-            index = indices[self.rank_id * per_batch:(self.rank_id + 1) * per_batch]
+            if self.full_batch:
+                index = indices
+            else:
+                per_batch = len(indices) // self.device_num
+                index = indices[self.rank_id * per_batch:(self.rank_id + 1) * per_batch]   
             for idx in index:
                 data.append(self.dataset[idx])
 

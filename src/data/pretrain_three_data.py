@@ -42,9 +42,9 @@ def build_dataloader_ms(dataset, collate_fn, is_train, opts, device_num):
     else:
         batch_size = opts.val_batch_size
 
-    sampler = EasySampler(dataset, batch_size=batch_size, device_num=device_num)
+    sampler = EasySampler(dataset, batch_size=batch_size, device_num=device_num, full_batch=opts.full_batch)
 
-    loader = DataLoader(dataset, batch_sampler=sampler, collate_fn=collate_fn, device_num=device_num)
+    loader = DataLoader(dataset, batch_sampler=sampler, collate_fn=collate_fn, device_num=device_num, full_batch=opts.full_batch)
     return loader
 
 def build_dataloader_ft(dataset, collate_fn, is_train, opts, device_num):
@@ -52,9 +52,9 @@ def build_dataloader_ft(dataset, collate_fn, is_train, opts, device_num):
         batch_size = opts.train_batch_size
     else:
         batch_size = opts.val_batch_size
-    sampler = BatchSampler(len(dataset), batch_size=batch_size, device_num=device_num)
-    loader = DataLoader(dataset, batch_sampler=sampler,is_train=is_train,collate_fn=collate_fn, device_num=device_num,
-                        drop_last=True)
+    sampler = BatchSampler(len(dataset), batch_size=batch_size, device_num=device_num, full_batch=opts.full_batch)
+    loader = DataLoader(dataset, batch_sampler=sampler, is_train=is_train, collate_fn=collate_fn, device_num=device_num,
+                        full_batch=opts.full_batch, drop_last=True)
     return loader
 
 def build_dataloader_audio(dataset, collate_fn, device_num, batch_size=4):

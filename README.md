@@ -168,12 +168,12 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
    <https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt> \
    下载至model/retrieval/路径下
 
-   启动训练：\
-   bash scripts/train_retrieval_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]
+   启动训练（默认配置使用8卡训练）：\
+   bash scripts/train_retrieval_parallel.sh 8 0,1,2,3,4,5,6,7 [RANK_TABLE_FILE]
    （各项参数说明参考Mindspore官方文档）
 
-   启动测试（将test_retrieval.sh中的ckpt模型路径更换成自己训练的）：\
-   bash scripts/test_retrieval.sh
+   启动测试（将eval_retrieval.sh中的ckpt模型路径更换成自己训练的）：\
+   bash scripts/eval_retrieval.sh
 
    评估结果：
   

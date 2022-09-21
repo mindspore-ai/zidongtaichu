@@ -1,5 +1,5 @@
 {
-  "model_config": "config/retrieval/cross_modal_encoder_config_vit448_type0_bs9.json",
+  "model_config": "config/retrieval/cross_modal_encoder_config_vit448_type0.json",
   "mrm_prob": 0.15,
   "itm_neg_prob": 0.5,
   "itm_ot_lambda": 0.1,
@@ -8,15 +8,12 @@
   "max_bb": 100,
   "min_bb": 10,
   "num_bb": 36,
-  "train_batch_size": 3,
+  "train_batch_size": 24,
   "val_batch_size": 10,
-  "gradient_accumulation_steps": 1,
-  "learning_rate": 2.5e-05,
-  "start_learning_rate": 2.5e-05,
-  "end_learning_rate": 1e-08,
-  "decay_steps": 20000,
-  "valid_steps": 1000,
-  "num_train_steps": 100000,
+  "full_batch": true,
+  "tensor_shard_size": 8,
+  "enable_parallel_optimizer": false,
+  "optimizer_shard_size": 1,
   "optim": "adamw",
   "betas": [
     0.9,
@@ -58,7 +55,7 @@
         ]
       }
     ],
-    "ids_val_path": "dataset/retrieval/val/mscoco_val_three_150.json",
+    "ids_val_path": "dataset/retrieval/val/mscoco_val_three_160.json",
     "val_datasets": [
       {
         "name": "open",
