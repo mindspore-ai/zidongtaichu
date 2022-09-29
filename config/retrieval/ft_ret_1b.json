@@ -11,7 +11,7 @@
   "train_batch_size": 24,
   "val_batch_size": 10,
   "full_batch": true,
-  "tensor_shard_size": 8,
+  "tensor_shard_size": 4,
   "enable_parallel_optimizer": false,
   "optimizer_shard_size": 1,
   "optim": "adamw",
