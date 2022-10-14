@@ -83,15 +83,16 @@ class UniterThreeForPretrainingWithLoss(nn.Cell):
         parallel_config.fusion_group = group_for_loss
         parallel_config.optimizer_shard = False
         fg_backbone = fusion_group_backbone // parallel_config.fusion_group
-        self.txt_cfg = copy.deepcopy(cfg)
-        self.txt_output = TransformerModel(cfg, True, config.hidden_size, parallel_config, fg_backbone, False)
-        self.td_crit = TransformerTrainingLoss(cfg, parallel_config)
+        txt_cfg = copy.deepcopy(cfg)
+        self.txt_output = TransformerModel(txt_cfg, True, config.hidden_size, parallel_config, fg_backbone, False)
+        self.td_crit = TransformerTrainingLoss(txt_cfg, parallel_config)
 
         # Image Generator
-        cfg.vocab_size = C.IMG_TOKEN_SIZE
-        cfg.seq_length = C.IMG_TOKEN_LEN
-        self.img_output = TransformerModel(cfg, True, config.hidden_size, parallel_config, fg_backbone + 2, False)
-        self.id_crit = TransformerTrainingLoss(cfg, parallel_config)
+        img_cfg = copy.deepcopy(cfg)
+        img_cfg.vocab_size = C.IMG_TOKEN_SIZE
+        img_cfg.seq_length = C.IMG_TOKEN_LEN
+        self.img_output = TransformerModel(img_cfg, True, config.hidden_size, parallel_config, fg_backbone + 2, False)
+        self.id_crit = TransformerTrainingLoss(img_cfg, parallel_config)
 
         # Audio Generaotr
         # preprocess_config = yaml.load(open(args.audio_preprocess_config, "r"), Loader=yaml.FullLoader)

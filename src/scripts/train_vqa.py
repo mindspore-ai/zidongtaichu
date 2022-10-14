@@ -19,7 +19,7 @@ import time
 from mindspore import context
 from mindspore.communication.management import init, get_group_size, get_rank
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
-from mindspore.train.callback import CheckpointConfig, ModelCheckpoint, TimeMonitor
+from mindspore.train.callback import LossMonitor, TimeMonitor, CheckpointConfig, ModelCheckpoint, SummaryCollector
 from mindspore.train.model import Model
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from pathlib2 import Path
@@ -36,7 +36,6 @@ from src.model_mindspore.parallel_transformer import ParallelConfig
 from src.tools.const import IMG_LABEL_DIM, AUDIO_LABEL_DIM
 from src.config.config import *
 from src.tools.misc import parse_with_config, set_random_seed
-from src.tools.monitor import LossMonitorSingleTask
 
 def init_env(opts):
     """ init_env """
@@ -159,8 +158,7 @@ def main(opts):
                                                             audio_dim=AUDIO_DIM, audio_label_dim=AUDIO_LABEL_DIM,
                                                             use_txt_out=opts.use_txt_out, use_video=opts.use_video,
                                                             full_batch=opts.full_batch, use_moe=opts.use_moe,
-                                                            is_parallel=opts.use_parallel)
-    print(net_with_loss)
+                                                            is_parallel=opts.use_parallel, args=opts)
     
     load_ckpt(net_with_loss, opts.ckpt_file.strip())
     load_vit_ckpt(net_with_loss, opts.vit_ckpt_file.strip())
@@ -175,7 +173,7 @@ def main(opts):
                                              scale_window=opts.scale_window)
     net_with_grads = TrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer,
                                                    scale_sense=update_cell)
-    callback = [TimeMonitor(callback_size), LossMonitorSingleTask(callback_size,verbose=False)]
+    callback = [TimeMonitor(callback_size), LossMonitor(callback_size,verbose=False)]
     if local_rank == 0:
         if not opts.save_checkpoint_steps:
             opts.save_checkpoint_steps = dataset_size
@@ -216,15 +214,13 @@ if __name__ == "__main__":
     parser.add_argument('--vit_ckpt_file', default="", type=str)
     parser.add_argument('--ckpt_file', default="", type=str)
     
-    parser.add_argument("--start_learning_rate", default=1e-5, type=float,
+    parser.add_argument("--start_learning_rate", default=5e-5, type=float,
                         help="The initial learning rate for Adam.")
     parser.add_argument("--end_learning_rate", default=1e-7, type=float,
                         help="The end learning rate for Adam.")
     parser.add_argument("--decay_steps", default=0, type=int,
                         help="lr decay steps.")
     parser.add_argument("--decay_epochs", default=10, type=int, help="lr decay epochs.")
-    parser.add_argument("--train_batch_size", default=10, type=int,
-                        help="The decay step.")
     parser.add_argument("--epochs", default=10, type=int,
                         help="The decay step.")
     

@@ -1,5 +1,6 @@
 {
     "model_config": "config/vqa/cross_modal_encoder_base.json",
+    "train_batch_size": 10,
     "val_batch_size": 10,
     "gradient_accumulation_steps": 1,
     "valid_steps": 1000,
