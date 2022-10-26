@@ -88,7 +88,7 @@ class ParallelConfig:
     optimizer_shard = False
     fusion_group = 1
     parallel_mode = ParallelMode.SEMI_AUTO_PARALLEL
-    vocab_emb_dp = False
+    vocab_emb_dp = True
     ep = dp
     capacity_factor = 1.5
     expert_num = 32

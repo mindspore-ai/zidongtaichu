@@ -1,15 +1,15 @@
 #!/bin/bash
 
-output_dir="output/retrieval"
-task_name="finetune_retrieval"
-task_config_file="ft_ret_1b.json"
-ckpt_name="3_25635"
-ckpt_file="OPT_ret-$ckpt_name.ckpt"
+output_dir="output/caption"
+task_name="finetune_caption"
+task_config_file="ft_cap_1b.json"
+ckpt_name="10_14153"
+ckpt_file="OPT_cap-$ckpt_name.ckpt"
 
 if [ $# != 3 ]
 then
     echo "Usage:
-          bash scripts/eval_retrieval_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]"
+          bash scripts/eval_caption_parallel.sh [DEVICE_NUM] [VISIABLE_DEVICES(0,1,2,3,4,5,6,7)] [RANK_TABLE_FILE]"
 exit 1
 fi
 
@@ -57,10 +57,11 @@ do
     mkdir -p ${output_dir:?}/${task_name:?}/rank_$i
     echo "start training for rank $RANK_ID, device $DEVICE_ID"
     env > $output_dir/$task_name/rank_$i/env.log
-    nohup python -u src/scripts/eval_retrieval.py \
-        --config=config/retrieval/$task_config_file \
+    nohup python -u src/scripts/eval_caption.py \
+        --config=config/caption/$task_config_file \
         --output_dir=$output_dir/$task_name \
         --finetune_ckpt_file=$output_dir/$task_name/ckpt/rank_0/$ckpt_file \
         --use_parallel=True \
         > $output_dir/$task_name/rank_$i/log_eval_$ckpt_name 2>&1 &
 done
+

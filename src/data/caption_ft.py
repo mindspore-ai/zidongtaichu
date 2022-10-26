@@ -43,14 +43,9 @@ class CaptionDataset(TxtImgTwoDataset):
 
         txt_inputs, txt_gts, txt_masks = self._get_txt_token(example['input_ids'])
 
-        # text mask input and gt text
-        # input_ids, txt_labels = self.create_mlm_io(example['input_ids'])
-
         # img input
-
-        img_feat, _, _,image = self._get_img_feat(example['img_fname'])
-        img_pos_feat  = np.arange(img_feat.shape[0] +1)
-        attn_masks = np.ones(img_pos_feat.shape[0], dtype=np.int64)
+        img_feat, img_pos_feat, _, image = self._get_img_feat(example['img_fname'])
+        attn_masks = np.ones(img_feat.shape[0], dtype=np.int64)
 
 
         return (ids, img_feat, img_pos_feat, attn_masks,
@@ -64,20 +59,8 @@ def caption_collate(inputs):
 
     # image batches
     num_bbs = [f.shape[0] for f in img_feats]
-    if len(img_feats[0].shape) == 3:
-        ### 3-dimension raw patch:
-        img_feat = np.stack(img_feats,axis=0)
-    else:
-        ### 2-dimension feat
-        img_feat = pad_tensors(img_feats, num_bbs, max_len=config.MAX_IMG_LEN)
-    if img_pos_feats[0] is not None:
-        if len(img_pos_feats[0].shape) == 1: ### for vit patch
-            img_pos_feat = np.stack(img_pos_feats,axis=0)
-        else:
-            
-            img_pos_feat = pad_tensors_pos(img_pos_feats, num_bbs, img_feat, max_len=config.MAX_IMG_LEN)
-    else:
-        img_pos_feat = None ### for vit feature
+    img_feat = pad_tensors(img_feats, num_bbs, max_len=config.MAX_IMG_LEN)
+    img_pos_feat = pad_tensors_pos(img_pos_feats, num_bbs, img_feat, max_len=config.MAX_IMG_LEN)
 
     # audio batches
 

@@ -56,11 +56,11 @@ do
     export RANK_ID=$((rank_start + i))
     mkdir -p ${output_dir:?}/${task_name:?}/rank_$i
     echo "start training for rank $RANK_ID, device $DEVICE_ID"
-    env > env.log
+    env > $output_dir/$task_name/rank_$i/env.log
     nohup python -u src/scripts/train_retrieval.py \
         --config=config/retrieval/$task_config_file \
         --output_dir=$output_dir/$task_name \
         --pretrain_ckpt_file=model/retrieval/$pretrain_ckpt_file \
-        --use_parallel="true" \
+        --use_parallel=True \
         > $output_dir/$task_name/rank_$i/log_train 2>&1 &
 done

@@ -245,7 +245,6 @@ class UniterImageEmbeddings(nn.Cell):
     def construct(self, img_feat, img_pos_feat, type_embeddings, img_masks=None, images=None):
         """ construct """
 
-        
         if self.use_vit:
             if self.vit_type == 0:
                 img_feat = self.vit(img_feat)

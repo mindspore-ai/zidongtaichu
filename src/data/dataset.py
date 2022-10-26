@@ -18,7 +18,6 @@ Create dataset for training and evaluating
 from mindspore.dataset import GeneratorDataset
 
 from src.data import MetaLoader, MetaLoaderAudio, data_column, data_column_audio
-from src.tools.misc import set_random_seed
 from src.data.pretrain_three_data import create_three_dataloaders
 from src.config import config as C
 
@@ -90,7 +89,6 @@ def create_dataset(opts, device_num=1,
     Returns:
         dataset_restore: the dataset for training
     """
-    set_random_seed(opts.seed)
     if is_train:
         data_loaders, datalen = create_three_dataloaders(opts.ids_train_path, opts.train_datasets, is_train,
                                                       opts, device_num=device_num)
@@ -130,7 +128,6 @@ def create_audio_dataset(opts, device_num=1, is_train=True):
     Returns:
         dataset_restore: the dataset for training
     """
-    set_random_seed(opts.seed)
     if is_train:
         train_data_loaders, datalen = create_three_dataloaders(opts.ids_train_path, opts.train_datasets, is_train,
                                                       opts, device_num=device_num)

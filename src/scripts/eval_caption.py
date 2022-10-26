@@ -16,36 +16,37 @@ import os
 import time
 import argparse
 import json
-import math
+import time
 import numpy as np
 from pathlib2 import Path
 import mindspore as ms
-from mindspore import context, ops
-from mindspore.train.model import Model
-from mindspore.common.tensor import Tensor
+from mindspore import context, Model, Tensor
 from mindspore.communication.management import init, get_group_size, get_rank
-from mindspore.train.serialization import load_checkpoint, load_param_into_net
+from mindspore import load_checkpoint, load_param_into_net
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..")))
 from src.config.config import *
-from src.data import create_dataset, get_batch_data
+from src.data.generator import get_batch_data_captioneval
 from src.data.utils import pad_sequence
 from src.model_mindspore.parallel_transformer import ParallelConfig
-from src.model_mindspore.retrieval_ms import UniterThreeForPretrainingForRetFinetuneEval
+from src.model_mindspore.caption_ms import UniterThreeForPretrainingForCapFinetuneEval
+from src.data.pretrain_three_data import create_three_dataloaders
 from src.tools.misc import parse_with_config, set_random_seed
+from src.tools.aic_caption.pycxevalcap.eval import COCOEvalCap
+from src.tools.aic_caption.pycxtools.coco import COCO
 
 def init_env(opts):
     """ init_env """
     if opts.use_parallel:
-        device_id = int(os.getenv('DEVICE_ID', '0'))
+        device_id = int(os.getenv('DEVICE_ID'))
         print('device_id:{}'.format(device_id))
         rank_id_str = os.getenv('RANK_ID', '0')
         rank_id = int(rank_id_str[rank_id_str.rfind('-') + 1:])
         print('rank_id:{}'.format(rank_id), "rank_id str:{}".format(rank_id_str))
     else:
         device_num = 1
-        device_id = int(os.getenv('DEVICE_ID', '0'))
+        device_id = int(os.getenv('DEVICE_ID'))
         rank = 0
         rank_id = 0
         opts.rank = rank
@@ -93,7 +94,7 @@ def init_env(opts):
         print("===========optimizer_weight_shard_size============", optimizer_weight_shard_size)
         context.set_auto_parallel_context(
             parallel_mode=context.ParallelMode.SEMI_AUTO_PARALLEL,
-            gradients_mean=True,
+            gradients_mean=False,
             device_num=device_num,
             full_batch=opts.full_batch,
             enable_alltoall=True,
@@ -114,13 +115,14 @@ def init_env(opts):
                f"val_batch_size:{opts.val_batch_size}"))
     else:
         device_num = 1
+        print(f"val_batch_size:{opts.val_batch_size}")
 
     # init dataset
-    ds = create_dataset(opts, device_num=device_num, is_train=False)
-    dataset_size = ds.get_dataset_size()
-    print("=====dataset size: ", dataset_size, flush=True)
+    test_loader, _ = create_three_dataloaders(opts.ids_val_path, opts.val_datasets, False,
+                                            opts, device_num=device_num)
+    dataset = test_loader['ftCap']
 
-    return rank_id, ds
+    return rank_id, dataset
 
 def load_pretrain_ckpt(net, ckpt_file):
     if not ckpt_file:
@@ -128,11 +130,17 @@ def load_pretrain_ckpt(net, ckpt_file):
     print('start loading pretrain ckpt:', ckpt_file)
     param_dict = load_checkpoint(ckpt_file)
     if param_dict:
+        new_param_dict = {}
+        for key in param_dict.keys():
+            if key.find("txt_output.tfm_decoder") >= 0:
+                key_new = key[:22] + ".decoder.tfm_decoder" + key[22:]
+                new_param_dict[key_new] = param_dict[key]
+            else:
+                new_param_dict[key] = param_dict[key]
+        param_dict = new_param_dict
         param_dict["uniter.img_embeddings.img_linear.weight"] = param_dict["feat_regress.weight"]
         param_dict["uniter.audio_embeddings.audio_linear.weight"] = param_dict["audio_feat_regress.weight"]
         param_dict["uniter.embeddings.word_embeddings.embedding_table"] = param_dict["cls.predictions.decoder.weight"]
-        param_dict["rank_output.weight"] = ms.Parameter(param_dict["itm_output.weight"].data[2:3, :])
-        param_dict["rank_output.bias"] = ms.Parameter(param_dict["itm_output.bias"].data[2:3])
         param_not_load = load_param_into_net(net, param_dict)
         print("==========param not load==========:", param_not_load)
         print('load pretrain ckpt finished:', ckpt_file)
@@ -143,6 +151,13 @@ def load_finetune_ckpt(net, ckpt_file):
     print('start loading finetune ckpt:', ckpt_file)
     param_dict = load_checkpoint(ckpt_file)
     if param_dict:
+        new_param_dict = {}
+        for key in param_dict.keys():
+            if key.find("txt_output.tfm_decoder") >= 0:
+                key_new = key[:22] + ".decoder.tfm_decoder" + key[22:]
+                new_param_dict[key_new] = param_dict[key]
+            new_param_dict[key] = param_dict[key]
+        param_dict = new_param_dict
         param_not_load = load_param_into_net(net, param_dict)
         print("==========param not load==========:", param_not_load)
         print('load finetune ckpt finished:', ckpt_file)
@@ -159,11 +174,17 @@ def load_distributed_pretrain_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name
     print('start loading distributed pretrain ckpt:', ckpt_file)  
     param_dict = load_checkpoint(ckpt_file)
     if param_dict:
+        new_param_dict = {}
+        for key in param_dict.keys():
+            if key.find("txt_output.tfm_decoder") >= 0:
+                key_new = key[:22] + ".decoder.tfm_decoder" + key[22:]
+                new_param_dict[key_new] = param_dict[key]
+            else:
+                new_param_dict[key] = param_dict[key]
+        param_dict = new_param_dict
         param_dict["uniter.img_embeddings.img_linear.weight"] = param_dict["feat_regress.weight"]
         param_dict["uniter.audio_embeddings.audio_linear.weight"] = param_dict["audio_feat_regress.weight"]
         param_dict["uniter.embeddings.word_embeddings.embedding_table"] = param_dict["cls.predictions.decoder.weight"]
-        param_dict["rank_output.weight"] = ms.Parameter(param_dict["itm_output.weight"].data[2:3, :])
-        param_dict["rank_output.bias"] = ms.Parameter(param_dict["itm_output.bias"].data[2:3])
         param_not_load = load_param_into_net(net, param_dict)
         print("==========param not load==========:", param_not_load)
         print('load distributed pretrain ckpt finished:', ckpt_file)
@@ -179,117 +200,192 @@ def load_distributed_finetune_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name
         return
     print('start loading distributed finetune ckpt:', ckpt_file)
     param_dict = load_checkpoint(ckpt_file)
-    if param_dict:        
+    if param_dict:
+        new_param_dict = {}
+        for key in param_dict.keys():
+            if key.find("txt_output.tfm_decoder") >= 0:
+                key_new = key[:22] + ".decoder.tfm_decoder" + key[22:]
+                new_param_dict[key_new] = param_dict[key]
+            else:
+                new_param_dict[key] = param_dict[key]
+        param_dict = new_param_dict
         param_not_load = load_param_into_net(net, param_dict)
         print("==========param not load==========:", param_not_load)
         print('load distributed finetune ckpt finished:', ckpt_file)
 
 def create_fake_input(batch_size):
-    input_ids = Tensor(np.array(np.random.randint(VOCAB_SIZE, size=(batch_size, MAX_FULL_TEXT_LEN)), dtype=np.int32), ms.int32)
-    position_ids = Tensor(np.expand_dims(np.arange(0, MAX_FULL_TEXT_LEN, dtype=np.int32), axis=0), ms.int32)
     img_feat = Tensor(np.random.rand(batch_size, MAX_IMG_LEN, PATCH_SIZE ** 2 * 3), ms.float32)
     img_pos_feat = Tensor(np.expand_dims(np.arange(0, MAX_IMG_LEN, dtype=np.int32), axis=0), ms.int32)
-    audio_feat = Tensor(np.zeros((batch_size, MAX_AUDIO_LEN, AUDIO_DIM), dtype=np.float32), ms.float32)
-    audio_pos_ids = Tensor(np.zeros((1, MAX_AUDIO_LEN), dtype=np.int32), ms.int32)
-    attention_mask = Tensor(pad_sequence(np.ones((batch_size, MAX_IMG_TEXT_LEN), dtype=np.int32), batch_first=True, padding_value=0, max_lens=MAX_FULL_LEN), ms.int32)
-    gather_index = Tensor(np.repeat(np.expand_dims(np.arange(0, MAX_FULL_LEN, dtype=np.int32), axis=0), batch_size, axis=0), ms.int32)
-    img_masks = Tensor(np.zeros((batch_size, MAX_IMG_LEN), dtype=np.bool_), ms.bool_)
-    
-    return (input_ids, position_ids, img_feat, img_pos_feat, audio_feat, audio_pos_ids,
-                  attention_mask, gather_index, img_masks)
-    
+    attention_mask = Tensor(pad_sequence(np.ones((batch_size, MAX_IMG_LEN), dtype=np.int32), 
+                                         batch_first=True, padding_value=0, max_lens=MAX_IMG_LEN), ms.int32)
+    gather_index = Tensor(np.repeat(np.expand_dims(np.arange(0, MAX_IMG_LEN, dtype=np.int32), axis=0), 
+                                    batch_size, axis=0), ms.int32)
+    return (img_feat, img_pos_feat, attention_mask, gather_index)
+
 def main(opts):
-    # init
-    (rank_id, ds) = init_env(opts)
-    # eval
-    net_without_loss = UniterThreeForPretrainingForRetFinetuneEval(opts.model_config, img_dim=IMG_DIM,
-                                                                    img_label_dim=IMG_LABEL_DIM,
-                                                                    audio_dim=AUDIO_DIM, audio_label_dim=AUDIO_LABEL_DIM,
-                                                                    use_txt_out=opts.use_txt_out, use_video=opts.use_video,
-                                                                    full_batch=opts.full_batch, use_moe=opts.use_moe,
-                                                                    args=opts, is_parallel=opts.use_parallel)
-
+    res_dir = os.path.join(opts.output_dir, 'eval')
+    if not os.path.exists(res_dir):
+        os.mkdir(res_dir)
+    if opts.pretrain_ckpt_file:
+        ckpt_name = opts.pretrain_ckpt_file
+    if opts.finetune_ckpt_file:
+        ckpt_name = opts.finetune_ckpt_file
+    if opts.pretrain_ckpt_name:
+        ckpt_name = opts.pretrain_ckpt_name
+    if opts.finetune_ckpt_name:
+        ckpt_name = opts.finetune_ckpt_name
+    res_name = os.path.splitext(os.path.split(ckpt_name)[-1])[0] + ".json"
+    res_path = os.path.join(res_dir, res_name)
+    print("result file:", res_path)
+    if os.path.exists(res_path):
+        eval_result = compute_metric(opts.caption_eval_gt, res_path, opts.cut)
+        json.dump(eval_result, open(res_path.replace('.json', '_metric.json'), 'w'))
+        print(eval_result)
+        return
+ 
+    (rank_id, dataset) = init_env(opts)
+    
+    print("start initializing model...")
+    net_without_loss = UniterThreeForPretrainingForCapFinetuneEval(opts.model_config, 
+                                                                   img_dim=IMG_DIM, audio_dim=AUDIO_DIM,
+                                                                   use_txt_out=opts.use_txt_out, use_video=opts.use_video, 
+                                                                   full_batch=opts.full_batch, use_moe=opts.use_moe, args=opts)
+    
     model = Model(net_without_loss)
-
-    (input_ids, position_ids, img_feat, img_pos_feat, audio_feat, audio_pos_ids, attention_mask, gather_index, img_masks) = \
-    create_fake_input(opts.val_batch_size)
-    model.predict(input_ids, position_ids, img_feat, img_pos_feat, audio_feat, audio_pos_ids, attention_mask, gather_index, img_masks) 
     
     # load ckpt
     load_pretrain_ckpt(net_without_loss, opts.pretrain_ckpt_file)
     load_finetune_ckpt(net_without_loss, opts.finetune_ckpt_file)
+    print("start building model...")
+    (img_feat, img_pos_feat, attention_mask, gather_index) = create_fake_input(opts.val_batch_size)
+    model.predict(img_feat, img_pos_feat, attention_mask, gather_index)
     load_distributed_pretrain_ckpt(net_without_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.pretrain_ckpt_name)
     load_distributed_finetune_ckpt(net_without_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.finetune_ckpt_name)
+
+    print("start validating...")
+    validate_td(model, dataset, opts, res_path)
+
+def validate_td(model, val_ds, opts, res_path):
+    """
+     validate_td
+    """
+    print("start running Text Decoder validation...")
     
-    ids = json.load(open(opts.ids_val_path,'r'))
-    print("retrieval dataset's length is: ", len(ids))
-    log = validate_itm_matching(model, ds, len(ids), is_parallel=opts.use_parallel)
-    print(log)
+    vocab = json.load(open(opts.vocab_path))
+    predictions = []
+    split = ''
+    total = 0
+    time_start = time.time()
+    for batch in val_ds:
+        ids = batch['ids']
+        (_, _, img_feat, img_pos_feat, _, _, attention_mask, gather_index, _, _, _, _, _, _, _, _, _, _,
+         _, _, _, _, _, _, _, _, _, _,_, _, _) = get_batch_data_captioneval(batch)
+        time_batch_start = time.time()
+        seq = model.predict(img_feat, img_pos_feat, attention_mask, gather_index)
+        
+        batch = seq.shape[0]
+        total += batch
+        seq = seq[:, 0, 1:]
+        seq = seq.asnumpy()
+        sents = decode_sequence(vocab, seq, split=split)
+        for k, sent in enumerate(sents):
+            image_id = ids[k].split('.jpg')[0][-6:]
+            entry = {'image_id': image_id, 'caption': sent}
+            print("image_id:{} caption:{}".format(image_id, sent))
+            predictions.append(entry)
+        
+        print("alreadyprocessed: ", total)
+        print("batch time: ", time.time() - time_batch_start)
+    
+    time_end = time.time()
+    total_time = time_end - time_start
+    print(total)
+    
+    print(f"total time cost {total_time}, per batch time {total_time / total * batch}")
+    
+    json.dump(predictions, open(res_path, "w"))
+    eval_result = compute_metric(opts.caption_eval_gt, res_path, opts.cut)
+    json.dump(eval_result,open(res_path.replace('.json','_metric.json'),'w'))
+    print(eval_result)
 
-def validate_itm_matching(model, val_ds, pair_num=1000, is_parallel = True):
-    topk = ops.TopK()
-    print("start running ITM validation...")
-    score_vec = Tensor(np.zeros((pair_num ** 2,)), ms.float32)
-    n_ex = 0
-    for batch in val_ds.create_dict_iterator():
-        (input_ids, position_ids, img_feat, img_pos_feat, audio_feat,
-            audio_pos_ids, attention_mask, gather_index, _, _,
-            _, _, _, img_masks, _, _, _, _, _, _,
-            _, _, _, _, _, _, _, _, _, _,_) = get_batch_data(batch)
-        scores = model.predict(input_ids, position_ids, img_feat, img_pos_feat, audio_feat, audio_pos_ids,
-                  attention_mask, gather_index, img_masks)
-        bs = scores.shape[0]
-        score_vec[n_ex:n_ex + bs] = scores[:,0]
-        n_ex += bs
-        print(f"{n_ex}/{pair_num ** 2}")
-        if n_ex >= pair_num ** 2:
-            break
+def process_gt_file(gt_path, gt_processed_path):
+    """
+    process_gt_gile
+    """
+    src = json.load(open(gt_path))
+    tgt = {}
+    tgt['annotations'] = []
+    for k, v in src.items():
+        while len(k) < 6:
+            k = '0' + k
+        for vs in v:
+            js = {'image_id': k, 'caption': vs, 'id': k}
+            tgt['annotations'].append(js)
+    print(len(tgt['annotations']))
+    json.dump(tgt, open(gt_processed_path, 'w'))
 
-    if not is_parallel or get_rank()==0:
-        score_vec = score_vec[:n_ex]
-        k = 10
-        score_mat = score_vec.reshape((int(math.sqrt(n_ex)), -1))
+def compute_metric(gt_path, predict_path, cut):
+    """
+    compute_metric
+    """
+    gt_processed_path = gt_path.split('.json')[-2] + '_processed' + '.json'
+    if not os.path.exists(gt_processed_path):
+        process_gt_file(gt_path, gt_processed_path)
+    coco = COCO(gt_processed_path, cut=cut)
+    cocoRes = coco.loadRes(predict_path, cut=cut)
+    cocoEval = COCOEvalCap(coco, cocoRes)
+    cocoEval.evaluate()
+    return cocoEval.eval
 
-        max_targets = np.arange(0, int(math.sqrt(n_ex)), dtype=np.int64)
-        values, topk_indices = topk(score_mat, 10)
-        topk_ind = topk_indices.asnumpy()
-        gt_img_j = np.expand_dims(max_targets, 1).repeat(k, axis=1)
-        _, rank = np.nonzero(topk_ind == gt_img_j)
-        tr_r1 = (rank < 1).sum().item() / int(math.sqrt(n_ex))
-        tr_r5 = (rank < 5).sum().item() / int(math.sqrt(n_ex))
-        tr_r10 = (rank < 10).sum().item() / int(math.sqrt(n_ex))
-
-        score_mat = score_mat.T
-        values, topk_indices = topk(score_mat, 10)
-        topk_ind = topk_indices.asnumpy()
-        gt_img_j = np.expand_dims(max_targets, 1).repeat(k, axis=1)
-        _, rank = np.nonzero(topk_ind == gt_img_j)
-        ir_r1 = (rank < 1).sum().item() / int(math.sqrt(n_ex))
-        ir_r5 = (rank < 5).sum().item() / int(math.sqrt(n_ex))
-        ir_r10 = (rank < 10).sum().item() / int(math.sqrt(n_ex))
-
-        ret_logs = {}
-        ret_logs["ir_r1"] = ir_r1
-        ret_logs["ir_r5"] = ir_r5
-        ret_logs["ir_r10"] = ir_r10
-        ret_logs["tr_r1"] = tr_r1
-        ret_logs["tr_r5"] = tr_r5
-        ret_logs["tr_r10"] = tr_r10
-        return ret_logs
-    return None
+# Input: seq, N*D numpy array, with element 0 .. vocab_size. 0 is END token.
+def decode_sequence(ix_to_word, seq, split=' '):
+    """
+    decode_sequence
+    """
+    bad_endings = ['with', 'in', 'on', 'of', 'a', 'at', 'to', 'for', 'an', 'this', 'his', 'her', 'that']
+    bad_endings += ['the']
+    N = seq.shape[0]
+    D = seq.shape[1]
+    out = []
+    for i in range(N):
+        txt = ''
+        for j in range(D):
+            ix = seq[i, j]
+            if ix > 0:
+                if j >= 1:
+                    txt = txt + split
+                txt = txt + ix_to_word[str(ix.item())]
+            else:
+                break
+        if int(os.getenv('REMOVE_BAD_ENDINGS', '0')):
+            flag = 0
+            words = txt.split(' ')
+            for j in range(len(words)):
+                if words[-j - 1] not in bad_endings:
+                    flag = -j
+                    break
+            txt = ' '.join(words[0:len(words) + flag])
+        out.append(txt.replace(' ##', ''))
+    return out
 
 def str2bool(b):
     if b.lower() in ["false"]:
         return False
+    # elif b.lower() in ["true"]:
     return True
 
 if __name__ == "__main__":
     project_root = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + os.path.sep + "../..")
     print('project_root:', project_root)
     print('process id:', os.getpid())
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default="", help='JSON config files')
     parser.add_argument('--output_dir', default="", type=str, help='output directory')
+    
+    parser.add_argument('--cut', default=True, type=str2bool)
+    parser.add_argument('--beam_width', default=1, type=int)
+
     parser.add_argument('--use_parallel', default=True,
                         type=str2bool, help='use parallel')
     parser.add_argument('--use_txt_out', default=False,
@@ -319,5 +415,6 @@ if __name__ == "__main__":
         assert args.max_bb + args.max_txt_len + 2 <= 512
     else:
         assert args.num_bb + args.max_txt_len + 2 <= 512
+
     print(args)
     main(args)

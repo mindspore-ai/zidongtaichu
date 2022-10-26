@@ -15,23 +15,26 @@
 import argparse
 import os
 import time
+from pathlib2 import Path
 
+import mindspore as ms
+from mindspore import ops as P
 from mindspore import context
 from mindspore.communication.management import init, get_group_size, get_rank
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from mindspore.train.callback import LossMonitor, TimeMonitor, CheckpointConfig, ModelCheckpoint, SummaryCollector
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.train.model import Model
-from pathlib2 import Path
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..")))
 from src.data import create_dataset
-from src.model_mindspore.cell_wrapper import ParallelTrainOneStepWithLossScaleCell, TrainOneStepWithLossScaleCell
 from src.model_mindspore.optim_ms import build_optimizer
 from src.model_mindspore.caption_ms import UniterThreeForPretrainingForCapFinetune
 from src.model_mindspore.utils import LearningRate
 from src.model_mindspore.parallel_transformer import ParallelConfig
+from src.model_mindspore.cell_wrapper import ParallelTrainOneStepWithLossScaleCell
+from src.config.config import *
 from src.tools.misc import parse_with_config, set_random_seed
 
 
@@ -79,23 +82,45 @@ def init_env(opts):
     if opts.use_parallel:
         init()
         print("start init")
+
         device_num = get_group_size()
-        ParallelConfig.dp = device_num
         rank = get_rank()
         opts.rank = rank
         print("device_id is {}, rank_id is {}, device_num is {}".format(
             device_id, rank, device_num))
         context.reset_auto_parallel_context()
+        
+        parallel_optimizer_config = {"gradient_accumulation_shard": True}
+        optimizer_weight_shard_size = opts.optimizer_shard_size
+        print("===========optimizer_weight_shard_size============", optimizer_weight_shard_size)
         context.set_auto_parallel_context(
-            parallel_mode=context.ParallelMode.DATA_PARALLEL,
-            gradients_mean=True,
-            device_num=device_num)
+            parallel_mode=context.ParallelMode.SEMI_AUTO_PARALLEL,
+            gradients_mean=False,
+            device_num=device_num,
+            full_batch=opts.full_batch,
+            enable_alltoall=True,
+            loss_repeated_mean=True,
+            enable_parallel_optimizer=opts.enable_parallel_optimizer,
+            strategy_ckpt_save_file=strategy_ckpt_save_file,
+            parallel_optimizer_config=parallel_optimizer_config,
+            optimizer_weight_shard_size=optimizer_weight_shard_size
+        )
+        
+        ParallelConfig.mp = opts.tensor_shard_size
+        ParallelConfig.dp = device_num // ParallelConfig.mp
+        ParallelConfig.optimizer_shard = opts.enable_parallel_optimizer
+        if opts.full_batch:
+            opts.train_batch_size = int(opts.train_batch_size * ParallelConfig.dp)
+        print((f"=====device_num:{device_num} dp:{ParallelConfig.dp} mp:{ParallelConfig.mp} "
+               f"enable_optimizer_shard:{ParallelConfig.optimizer_shard} op:{opts.optimizer_shard_size} " 
+               f"train_batch_size:{opts.train_batch_size}"))
     else:
         device_num = 1
-    ds = create_dataset(opts, device_num=device_num,
-                        token_size=opts.train_batch_size, is_train=True)
+
+    # init dataset
+    ds = create_dataset(opts, device_num=device_num, is_train=True)
     dataset_size = ds.get_dataset_size()
-    print("dataset size: ", dataset_size, flush=True)
+    print("=====dataset size: ", dataset_size, flush=True)
     if opts.dataset_sink_mode:
         if opts.callback_size > 0:
             new_epoch = opts.epochs * dataset_size // opts.callback_size
@@ -107,60 +132,84 @@ def init_env(opts):
         new_epoch = opts.epochs
         callback_size = opts.callback_size
 
-    return local_rank, rank_id, callback_size, strategy_ckpt_save_file, device_id, device_num, new_epoch, ds, dataset_size
-
-def load_ckpt(net, ckpt_file):
-    if not ckpt_file:
-        return
-    print(f"start loading ckpt:{ckpt_file}")
-    param_dict = load_checkpoint(ckpt_file)
-    if param_dict:
-        param_not_load = load_param_into_net(net, param_dict)
-        print("param not load:", param_not_load)
-    print(f"end loading ckpt:{ckpt_file}")
+    return local_rank, rank_id, callback_size, new_epoch, ds, dataset_size
 
 def load_pretrain_ckpt(net, ckpt_file):
     if not ckpt_file:
         return
-    print(f"start loading ckpt:{ckpt_file}")
+    print('start loading pretrain ckpt:', ckpt_file)
     param_dict = load_checkpoint(ckpt_file)
     if param_dict:
         param_dict["uniter.img_embeddings.img_linear.weight"] = param_dict["feat_regress.weight"]
         param_dict["uniter.audio_embeddings.audio_linear.weight"] = param_dict["audio_feat_regress.weight"]
         param_dict["uniter.embeddings.word_embeddings.embedding_table"] = param_dict["cls.predictions.decoder.weight"]
         param_not_load = load_param_into_net(net, param_dict)
-        print("param not load:", param_not_load)
-    print(f"end loading ckpt:{ckpt_file}")
+        print("==========param not load==========:", param_not_load)
+        print('load pretrain ckpt finished:', ckpt_file)
 
-def load_vit_ckpt(net, vit_ckpt_file):
-    if not vit_ckpt_file:
+def load_finetune_ckpt(net, ckpt_file):
+    if not ckpt_file:
         return
-    print(f"start loading img-encoder:{vit_ckpt_file}")
-    param_dict = load_checkpoint(vit_ckpt_file)
+    print('start loading finetune ckpt:', ckpt_file)
+    param_dict = load_checkpoint(ckpt_file)
     if param_dict:
-        param_dict = {}
-        for k,v in param_dict.items():
-            if k.startswith('encoder.'):        #vit 448
-                param_dict['uniter.img_embeddings.vit.' + k[8:]] = v
-        param_not_load = load_param_into_net(net.uniter.img_embeddings.vit, param_dict)
-        print("param not load:", param_not_load)
-    print(f"end loading img-encoder:{vit_ckpt_file}")
+        param_not_load = load_param_into_net(net, param_dict)
+        print("==========param not load==========:", param_not_load)
+        print('load finetune ckpt finished:', ckpt_file)
+
+def load_distributed_pretrain_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name):
+    ckpt_id = rank_id % ckpt_size
+    folder = "rank_" + str(ckpt_id)
+    if not ckpt_path or not ckpt_name:
+        return
+    ckpt_file = os.path.join(ckpt_path, folder, ckpt_name)
+    if not os.path.exists(ckpt_file):
+        print(f"ckpt_file:{ckpt_file} does not exists")
+        return
+    print('start loading distributed pretrain ckpt:', ckpt_file)  
+    param_dict = load_checkpoint(ckpt_file)
+    if param_dict:
+        param_dict["uniter.img_embeddings.img_linear.weight"] = param_dict["feat_regress.weight"]
+        param_dict["uniter.audio_embeddings.audio_linear.weight"] = param_dict["audio_feat_regress.weight"]
+        param_dict["uniter.embeddings.word_embeddings.embedding_table"] = param_dict["cls.predictions.decoder.weight"]
+        param_not_load = load_param_into_net(net, param_dict)
+        print("==========param not load==========:", param_not_load)
+        print('load distributed pretrain ckpt finished:', ckpt_file)
+
+def load_distributed_finetune_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name):
+    ckpt_id = rank_id % ckpt_size
+    folder = "rank_" + str(ckpt_id)
+    if not ckpt_path or not ckpt_name:
+        return
+    ckpt_file = os.path.join(ckpt_path, folder, ckpt_name)
+    if not os.path.exists(ckpt_file):
+        print(f"ckpt_file:{ckpt_file} does not exists")
+        return
+    print('start loading distributed finetune ckpt:', ckpt_file)
+    param_dict = load_checkpoint(ckpt_file)
+    if param_dict:        
+        param_not_load = load_param_into_net(net, param_dict)
+        print("==========param not load==========:", param_not_load)
+        print('load distributed finetune ckpt finished:', ckpt_file)
+
+class OverflowMonitor(ms.Callback):
+    def step_end(self, run_context):
+        cb_params = run_context.original_args()
+        overflow = cb_params.net_outputs[1]
+        if overflow:
+            cur_epoch_num = cb_params.get("cur_epoch_num", 1)
+            cur_step_in_epoch = (cb_params.cur_step_num - 1) % cb_params.batch_num + 1
+            scaling_sens = cb_params.net_outputs[2]
+            ms.ops.Print()(f"overflow detected in epoch {cur_epoch_num} step {cur_step_in_epoch}, loss scale: {scaling_sens}")
+        return super().step_end(run_context)
 
 def main(opts):
-    (local_rank, rank_id, callback_size, _, _, _,
-     new_epoch, ds, dataset_size) = init_env(opts)
-    opts.batch_size = opts.train_batch_size
-    net_with_loss = UniterThreeForPretrainingForCapFinetune(opts.model_config, img_dim=opts.img_dim,   
-                                                            audio_dim=opts.audio_dim,
-                                                            use_txt_out=opts.use_txt_out, use_video=opts.use_video,
-                                                            full_batch=opts.full_batch, use_moe=opts.use_moe,
-                                                            args=opts)
+    (local_rank, rank_id, callback_size, epochs, ds, dataset_size) = init_env(opts)
+    
+    net_with_loss = UniterThreeForPretrainingForCapFinetune(opts.model_config, img_dim=IMG_DIM, audio_dim=AUDIO_DIM, 
+                                                            full_batch=opts.full_batch, args=opts)
     if opts.display_net:
         print(net_with_loss)
-
-    load_ckpt(net_with_loss, opts.ckpt_file.strip())
-    load_vit_ckpt(net_with_loss, opts.vit_ckpt_file.strip())
-    load_pretrain_ckpt(net_with_loss, opts.pretrain_ckpt_file.strip())
 
     if not opts.decay_steps:
         opts.decay_steps = opts.decay_epochs * dataset_size
@@ -170,39 +219,48 @@ def main(opts):
     update_cell = DynamicLossScaleUpdateCell(loss_scale_value=opts.init_loss_scale,
                                              scale_factor=opts.loss_scale_factor,
                                              scale_window=opts.scale_window)
-    if opts.use_parallel:
-        net_with_grads = ParallelTrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer, 
-        scale_sense=update_cell, parallel_config=ParallelConfig)                
-    else:                                                    
-        net_with_grads = TrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer, 
-        scale_sense=update_cell)
+                                              
+    net_with_grads = ParallelTrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer, scale_sense=update_cell)
     model = Model(net_with_grads)
 
     print("init callback")
-    callback = [TimeMonitor(callback_size), LossMonitor(callback_size)]
+    callbacks = [TimeMonitor(callback_size), LossMonitor(callback_size), OverflowMonitor()]
+    
+    # modify check point callback
+    if not opts.save_checkpoint_steps:
+        opts.save_checkpoint_steps = dataset_size
+    ckpt_dir = os.path.join(opts.output_dir, "ckpt", f"rank_{str(local_rank)}")
+    if not os.path.exists(ckpt_dir):
+        Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
+    config_ck = CheckpointConfig(save_checkpoint_steps=opts.save_checkpoint_steps,
+                                    keep_checkpoint_max=0,
+                                    integrated_save=False)
+    ckpoint_cb = ModelCheckpoint(prefix="OPT_cap",
+                                    directory=ckpt_dir,
+                                    config=config_ck)
+    callbacks.append(ckpoint_cb)
+
     # modify summary callback
     if opts.save_summary:
         specified = {"collect_metric": True, "collect_graph": True, "collect_dataset_graph": True}
         summary_collector = SummaryCollector(summary_dir=os.path.join(opts.output_dir, 'summary'), 
         collect_specified_data=specified, collect_freq=1, keep_default_action=False, collect_tensor_freq=200)
-        callback.append(summary_collector)
-    # modify check point callback
-    if rank_id == 0:    
-        if not opts.save_checkpoint_steps:
-            opts.save_checkpoint_steps = dataset_size
-        ckpt_dir = os.path.join(opts.output_dir, "ckpt", f"rank_{str(local_rank)}")
-        if not os.path.exists(ckpt_dir):
-            Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
-        config_ck = CheckpointConfig(save_checkpoint_steps=opts.save_checkpoint_steps,
-                                     keep_checkpoint_max=10,
-                                     integrated_save=False)
-        ckpoint_cb = ModelCheckpoint(prefix="OPT_cap",
-                                     directory=ckpt_dir,
-                                     config=config_ck)
-        callback.append(ckpoint_cb)
+        callbacks.append(summary_collector)
+    
+    # build model
+    model = Model(net_with_grads)
+
+    # load ckpt
+    load_pretrain_ckpt(net_with_loss, opts.pretrain_ckpt_file)
+    load_finetune_ckpt(net_with_loss, opts.finetune_ckpt_file)
+    if opts.dataset_sink_mode:
+        print("start building...")
+        model.build(train_dataset=ds, sink_size=callback_size, epoch=epochs)
+    load_distributed_pretrain_ckpt(net_with_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.pretrain_ckpt_name)
+    load_distributed_finetune_ckpt(net_with_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.finetune_ckpt_name)
 
     print("start_training...")
-    model.train(new_epoch, ds, callbacks=callback, dataset_sink_mode=opts.dataset_sink_mode, sink_size=callback_size)
+    model.train(epochs, ds, callbacks=callbacks, dataset_sink_mode=opts.dataset_sink_mode, sink_size=callback_size)
 
 def str2bool(b):
     if b.lower() not in ["false", "true"]:
@@ -212,13 +270,25 @@ def str2bool(b):
     return True
 
 if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + os.path.sep + "../../")
+    print('project_root:', project_root)
     print('process id:', os.getpid())
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default="", help='JSON config files')
     parser.add_argument('--output_dir', default="", type=str, help='use audio out')
-    parser.add_argument('--ckpt_file', default="", type=str, help='use txt out')
-    parser.add_argument('--vit_ckpt_file', default="", type=str, help='use txt out')
-    parser.add_argument('--pretrain_ckpt_file', default="", type=str, help='use txt out')
+
+    parser.add_argument("--pretrain_ckpt_file", default=None,
+                        type=str, help="pretrain ckpt file path")
+    parser.add_argument("--finetune_ckpt_file", default=None,
+                        type=str, help="finetune ckpt file path")
+    parser.add_argument("--ckpt_size", default=32,
+                        type=int, help="distribute ckpt nums")
+    parser.add_argument("--ckpt_path", default=None,
+                        type=str, help="distribute ckpt path")
+    parser.add_argument("--pretrain_ckpt_name", default=None,
+                        type=str, help="distribute pretrain ckpt name")
+    parser.add_argument("--finetune_ckpt_name", default=None,
+                        type=str, help="distribute finetune ckpt name")
     
     parser.add_argument("--start_learning_rate", default=1e-5, type=float,
                         help="The initial learning rate for Adam.")
@@ -227,13 +297,16 @@ if __name__ == "__main__":
     parser.add_argument("--decay_steps", default=0, type=int,
                         help="lr decay steps.")
     parser.add_argument("--decay_epochs", default=10, type=int, help="lr decay epochs.")
-    parser.add_argument("--epochs", default=10, type=int, help="")
-    
+    parser.add_argument("--epochs", default=10, type=int, help="") 
+    parser.add_argument("--init_loss_scale", default=65536, type=int, help="")
+    parser.add_argument("--loss_scale_factor", default=2, type=int, help="")
+    parser.add_argument("--scale_window", default=1000, type=int, help="")
+        
     parser.add_argument('--callback_size', default=100, type=int, help='callback size.')
     parser.add_argument('--dataset_sink_mode', default=False, type=str2bool, help='dataset sink mode')
     parser.add_argument("--save_checkpoint_steps", default=0, type=int, help="")
     parser.add_argument('--save_summary', default=False, type=str2bool, help='save summary')
-    parser.add_argument("--full_batch", default=False, type=bool, help="")
+    parser.add_argument("--full_batch", default=True, type=bool, help="")
     parser.add_argument('--use_parallel', default=False, type=str2bool, help='use txt out')
     parser.add_argument('--display_net', default=False, type=str2bool, help='use txt out')
     
@@ -241,24 +314,9 @@ if __name__ == "__main__":
     parser.add_argument('--use_video', default=False, type=str2bool, help='use txt out')
     parser.add_argument('--data_type', default=2, type=int, help='use txt out')
 
-    parser.add_argument('--audio_dim', default=1024, type=int, help='use txt out')
-    parser.add_argument('--img_dim', default=2048, type=int, help='use txt out')
-    parser.add_argument('--use_data_fix', default=True, type=str2bool, help='use txt out')
-    parser.add_argument('--use_mask_fix', default=True, type=str2bool, help='use txt out')
-
     parser.add_argument('--name_txt', default="id2len_three.json", type=str, help='use txt out')
     parser.add_argument('--name_img', default="img2len_three.json", type=str, help='use img out')
     parser.add_argument('--name_audio', default="audio2len_three.json", type=str, help='use audio out')
-
-    parser.add_argument("--init_loss_scale", default=65536, type=float, help="")
-    parser.add_argument("--loss_scale_factor", default=2, type=float, help="")
-    parser.add_argument("--scale_window", default=1000, type=float, help="")
-    parser.add_argument('--data_url', required=True, default=None, help='Location of data.')
-    parser.add_argument('--train_url', required=True, default=None, help='Location of data.')
-    parser.add_argument("--bucket_dir", default="s3://muti-modal/ckpt/", type=str, help="")
-    parser.add_argument("--use_moe", default=False, type=bool, help="use moe")
-    parser.add_argument('--use_vit', default=True, type=str2bool, help='use txt out')
-    parser.add_argument('--use_patch', default=True, type=str2bool, help='use txt out')
 
     args = parse_with_config(parser)
     print(args)

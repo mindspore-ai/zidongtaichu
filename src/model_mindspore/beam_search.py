@@ -20,6 +20,8 @@ import mindspore.nn as nn
 from mindspore import ops
 from mindspore.ops import operations as P
 from mindspore.common.tensor import Tensor
+
+from .parallel_transformer import ParallelConfig
 INF = 1. * 1e9
 
 
@@ -34,15 +36,16 @@ class LengthPenalty(nn.Cell):
 
     def __init__(self,
                  weight=1.0,
+                 parallel_config=ParallelConfig,
                  compute_type=mstype.float32):
         super(LengthPenalty, self).__init__()
-        self.weight = weight
-        self.add = P.Add()
-        self.pow = P.Pow()
-        self.div = P.RealDiv()
         self.cast = P.Cast()
         self.five = Tensor(5.0, mstype.float32)
         self.six = Tensor(6.0, mstype.float32)
+        self.weight = Tensor(weight, mstype.float32)
+        self.add = P.Add().shard(((parallel_config.dp, 1), ()))
+        self.div = P.RealDiv().shard(((parallel_config.dp, 1), ()))
+        self.pow = P.Pow().shard(((parallel_config.dp, 1), ()))
 
     def construct(self, length_tensor):
         length_tensor_ = self.cast(length_tensor, mstype.float32)
@@ -50,7 +53,6 @@ class LengthPenalty(nn.Cell):
         output = self.div(output, self.six)
         output = self.pow(output, self.weight)
         return output
-
 
 class TileBeam(nn.Cell):
     """
@@ -63,18 +65,19 @@ class TileBeam(nn.Cell):
 
     def __init__(self,
                  beam_width,
+                 parallel_config=ParallelConfig,
                  compute_type=mstype.float32):
         super(TileBeam, self).__init__()
         self.beam_width = beam_width
-        self.expand = P.ExpandDims()
-        self.tile = P.Tile()
+        self.expand = P.ExpandDims().shard(((parallel_config.dp, 1, 1, 1),))
+        self.tile = P.Tile().shard(((parallel_config.dp, 1, 1, 1, 1),))
         self.reshape = P.Reshape()
         self.shape = P.Shape()
 
     def construct(self, input_tensor):
         """
-        input_tensor: shape [batch, dim1, dim2]
-        output_tensor: shape [batch*beam, dim1, dim2]
+        input_tensor: shape [batch, dim1, dim2, dim3]
+        output_tensor: shape [batch, beam, dim1, dim2, dim3]
         """
         shape = self.shape(input_tensor)
         input_tensor = self.expand(input_tensor, 1)
@@ -86,6 +89,40 @@ class TileBeam(nn.Cell):
         output = self.reshape(output, out_shape)
         return output
 
+class TileBeam1(nn.Cell):
+    """
+    TileBeam.
+
+    Args:
+        beam_width (int): beam width setting. Default: 4.
+        compute_type (:class:`mindspore.dtype`): Compute type in Transformer. Default: mstype.float32.
+    """
+
+    def __init__(self,
+                 beam_width,
+                 parallel_config=ParallelConfig,
+                 compute_type=mstype.float32):
+        super(TileBeam1, self).__init__()
+        self.beam_width = beam_width
+        self.expand = P.ExpandDims().shard(((parallel_config.dp, 1, 1),))
+        self.tile = P.Tile().shard(((parallel_config.dp, 1, 1, 1),))
+        self.reshape = P.Reshape()
+        self.shape = P.Shape()
+    
+    def construct(self, input_tensor):
+        """
+        input_tensor: shape [batch, dim1, dim2]
+        output_tensor: shape [batch, beam, dim1, dim2]
+        """
+        shape = self.shape(input_tensor)
+        input_tensor = self.expand(input_tensor, 1)
+        tile_shape = (1,) + (self.beam_width,)
+        for _ in range(len(shape) - 1):
+            tile_shape = tile_shape + (1,)
+        output = self.tile(input_tensor, tile_shape)
+        out_shape = (shape[0] * self.beam_width,) + shape[1:]
+        output = self.reshape(output, out_shape)
+        return output
 
 class Mod(nn.Cell):
     """
@@ -94,7 +131,6 @@ class Mod(nn.Cell):
     Args:
         compute_type (:class:`mindspore.dtype`): Compute type in Transformer. Default: mstype.float32.
     """
-
     def __init__(self,
                  compute_type=mstype.float32):
         super(Mod, self).__init__()
@@ -108,7 +144,6 @@ class Mod(nn.Cell):
         x = self.multiply(x, input_y)
         x = self.sub(input_x, x)
         return x
-
 
 class BeamSearchDecoder(nn.Cell):
     """
@@ -137,6 +172,7 @@ class BeamSearchDecoder(nn.Cell):
                  max_decode_length=150,
                  sos_id=1,
                  eos_id=2,
+                 parallel_config=ParallelConfig,
                  compute_type=mstype.float32,
                  task=""):
         super(BeamSearchDecoder, self).__init__(auto_prefix=False)
@@ -149,8 +185,7 @@ class BeamSearchDecoder(nn.Cell):
         self.max_decode_length = max_decode_length
         self.decoder = decoder
 
-        self.add = P.Add()
-        self.expand = P.ExpandDims()
+        self.expand = P.ExpandDims().shard(((1, 1),))
         self.reshape = P.Reshape()
         self.shape_flat = (-1,)
         self.shape = P.Shape()
@@ -160,27 +195,32 @@ class BeamSearchDecoder(nn.Cell):
         self.zero_tensor = Tensor(np.zeros([batch_size, beam_width]), mstype.float32)
         self.ninf_tensor = Tensor(np.full([batch_size, beam_width], -INF), mstype.float32)
 
-        self.select = P.Select()
         self.flat_shape = (batch_size, beam_width * vocab_size)
-        self.topk = P.TopK(sorted=True)
-        self.floor_div = P.FloorDiv()
         self.vocab_size_tensor = Tensor(self.vocab_size, mstype.int32)
-        self.real_div = P.RealDiv()
-        self.mod = Mod()
-        self.equal = P.Equal()
         self.eos_ids = Tensor(np.full([batch_size, beam_width], eos_id), mstype.int32)
 
         beam_ids = np.tile(np.arange(beam_width).reshape((1, beam_width)), [batch_size, 1])
         self.beam_ids = Tensor(beam_ids, mstype.int32)
         batch_ids = np.arange(batch_size * beam_width).reshape((batch_size, beam_width)) // beam_width
         self.batch_ids = Tensor(batch_ids, mstype.int32)
-        self.concat = P.Concat(axis=-1)
-        self.gather_nd = P.GatherNd()
+        self.concat = P.Concat(axis=-1).shard(((1, 1, 1), (1, 1, 1)))
+        self.gather_nd2 = P.GatherNd().shard(((1, 1), (parallel_config.dp, 1, 1)))
+        self.gather_nd3 = P.GatherNd().shard(((1, 1, 1), (parallel_config.dp, 1, 1)))
+        self.select = P.Select().shard(((parallel_config.dp, 1), (parallel_config.dp, 1), (parallel_config.dp, 1)))
+        self.strided_slice3 = P.StridedSlice().shard(((parallel_config.dp, 1, 1),))
 
-        self.greater_equal = P.GreaterEqual()
-        self.sub = P.Sub()
+        self.add = P.Add().shard(((parallel_config.dp, 1), ()))
+        self.add1 = P.Add().shard(((parallel_config.dp, 1), (parallel_config.dp, 1)))
+        self.add2 = P.Add().shard(((parallel_config.dp, 1, 1), (parallel_config.dp, 1, 1)))
+        self.sub = P.Sub().shard(((parallel_config.dp, 1), ()))
+        self.sub1 = P.Sub().shard(((parallel_config.dp, 1), (parallel_config.dp, 1)))
+        self.mul = P.Mul().shard(((parallel_config.dp, 1), ()))
+        self.div1 = P.RealDiv().shard(((parallel_config.dp, 1), (parallel_config.dp, 1)))
+        self.greater_equal = P.GreaterEqual().shard(((parallel_config.dp, 1), ()))
+        self.equal = P.Equal().shard(((parallel_config.dp, 1), (parallel_config.dp, 1)))
+        self.topk = P.TopK(sorted=True).shard(((parallel_config.dp, 1),))
+        self.zeroslike = P.ZerosLike().shard(((parallel_config.dp, 1),))
         self.cast = P.Cast()
-        self.zeroslike = P.ZerosLike()
 
         # init inputs and states
         self.start_ids = Tensor(np.full([batch_size * beam_width, 1], sos_id), mstype.int32)
@@ -189,7 +229,7 @@ class BeamSearchDecoder(nn.Cell):
         self.init_scores = Tensor(init_scores, mstype.float32)
         self.init_finished = Tensor(np.zeros([batch_size, beam_width], dtype=np.bool))
         self.init_length = Tensor(np.zeros([batch_size, beam_width], dtype=np.int32))
-        self.length_penalty = LengthPenalty(weight=length_penalty_weight)
+        self.length_penalty = LengthPenalty(weight=length_penalty_weight, parallel_config=parallel_config)
         self.one = Tensor(1, mstype.int32)
         self.tokens = Tensor(np.array(range(self.vocab_size)).reshape((vocab_size, 1, 1)), mstype.int32)
         self.start_ids_max = Tensor(np.full([batch_size * beam_width, self.max_decode_length], sos_id), mstype.int32)
@@ -206,11 +246,11 @@ class BeamSearchDecoder(nn.Cell):
         log_probs = self.reshape(log_probs, (self.batch_size, self.beam_width, self.vocab_size))
 
         # select topk indices
-        total_log_probs = self.add(log_probs, self.expand(state_log_probs, -1))
+        total_log_probs = self.add2(log_probs, self.expand(state_log_probs, -1))
 
         # mask finished beams
         mask_tensor = self.select(state_finished, self.ninf_tensor, self.zero_tensor)
-        total_log_probs = self.add(total_log_probs, self.expand(mask_tensor, -1))
+        total_log_probs = self.add2(total_log_probs, self.expand(mask_tensor, -1))
 
         # reshape scores to [batch, beam*vocab]
         flat_scores = self.reshape(total_log_probs, self.flat_shape)
@@ -222,8 +262,8 @@ class BeamSearchDecoder(nn.Cell):
         for _ in range(self.beam_width - 1):
             temp = self.sub(temp, self.vocab_size_tensor)
             res = self.cast(self.greater_equal(temp, 0), mstype.int32)
-            beam_indices = beam_indices + res
-        word_indices = topk_indices - beam_indices * self.vocab_size_tensor
+            beam_indices = self.add1(beam_indices, res)
+        word_indices = self.sub1(topk_indices, self.mul(beam_indices, self.vocab_size_tensor))
         # ======================================================================
 
         # mask finished indices
@@ -240,9 +280,9 @@ class BeamSearchDecoder(nn.Cell):
         _, tmp_indices = self.topk(tmp_log_probs, self.beam_width)
         # update
         tmp_gather_indices = self.concat((self.expand(self.batch_ids, -1), self.expand(tmp_indices, -1)))
-        beam_indices = self.gather_nd(beam_indices, tmp_gather_indices)
-        word_indices = self.gather_nd(word_indices, tmp_gather_indices)
-        topk_scores = self.gather_nd(topk_scores, tmp_gather_indices)
+        beam_indices = self.gather_nd2(beam_indices, tmp_gather_indices)
+        word_indices = self.gather_nd2(word_indices, tmp_gather_indices)
+        topk_scores = self.gather_nd2(topk_scores, tmp_gather_indices)
 
         ###### generate new beam_search states
         # gather indices for selecting alive beams
@@ -251,10 +291,10 @@ class BeamSearchDecoder(nn.Cell):
         # length add 1 if not finished in the previous step
         length_add = self.add(state_length, self.one)
         state_length = self.select(state_finished, state_length, length_add)
-        state_length = self.gather_nd(state_length, gather_indices)
+        state_length = self.gather_nd2(state_length, gather_indices)
 
         # concat seq
-        seq = self.gather_nd(state_seq, gather_indices)
+        seq = self.gather_nd3(state_seq, gather_indices)
         state_seq = self.concat((seq, self.expand(word_indices, -1)))
 
         # new finished flag and log_probs
@@ -302,13 +342,15 @@ class BeamSearchDecoder(nn.Cell):
             # add length penalty scores
             penalty_len = self.length_penalty(state_length)
             # get penalty length
-            log_probs = self.real_div(state_log_probs, penalty_len)
+            log_probs = self.div1(state_log_probs, penalty_len)
 
             # sort according to scores
             _, top_beam_indices = self.topk(log_probs, self.beam_width)
             gather_indices = self.concat((self.expand(self.batch_ids, -1), self.expand(top_beam_indices, -1)))
             # sort sequence
-            predicted_ids = self.gather_nd(state_seq, gather_indices)
+            predicted_ids = self.gather_nd3(state_seq, gather_indices)
             # take the first one
-            predicted_ids = predicted_ids[::, 0:1:1, ::]
+            ids_shape = self.shape(predicted_ids)
+            predicted_ids = self.strided_slice3(predicted_ids, (0, 0, 0), (ids_shape[0], 1, ids_shape[2]), (1, 1, 1))
+            # predicted_ids = predicted_ids[::, 0:1:1, ::]
             return predicted_ids

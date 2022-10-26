@@ -115,6 +115,8 @@ def init_env(opts):
         ParallelConfig.mp = opts.tensor_shard_size
         ParallelConfig.dp = device_num // ParallelConfig.mp
         ParallelConfig.optimizer_shard = opts.enable_parallel_optimizer
+        if opts.full_batch:
+            opts.train_batch_size = int(opts.train_batch_size * ParallelConfig.dp)        
         print((f"=====device_num:{device_num} dp:{ParallelConfig.dp} mp:{ParallelConfig.mp} "
                f"enable_optimizer_shard:{ParallelConfig.optimizer_shard} op:{opts.optimizer_shard_size} " 
                f"train_batch_size:{opts.train_batch_size} val_batch_size:{opts.val_batch_size}"))
@@ -139,16 +141,6 @@ def init_env(opts):
 
     return local_rank, rank_id, callback_size, new_epoch, ds, dataset_size
 
-def load_ckpt(net, ckpt_file):
-    if not ckpt_file:
-        return
-    print('start loading ckpt:', ckpt_file)
-    param_dict = load_checkpoint(ckpt_file)
-    if param_dict:
-        param_not_load = load_param_into_net(net, param_dict)
-        print("==========param not load==========:", param_not_load)
-        print('load ckpt finished:', ckpt_file)
-
 def load_pretrain_ckpt(net, ckpt_file):
     if not ckpt_file:
         return
@@ -164,21 +156,15 @@ def load_pretrain_ckpt(net, ckpt_file):
         print("==========param not load==========:", param_not_load)
         print('load pretrain ckpt finished:', ckpt_file)
 
-def load_distributed_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name):
-    ckpt_id = rank_id % ckpt_size
-    folder = "rank_" + str(ckpt_id)
-    if not ckpt_path or not ckpt_name:
+def load_finetune_ckpt(net, ckpt_file):
+    if not ckpt_file:
         return
-    ckpt_file = os.path.join(ckpt_path, folder, ckpt_name)
-    if not os.path.exists(ckpt_file):
-        print(f"ckpt_file:{ckpt_file} does not exists")
-        return
-    print('start loading distributed ckpt:', ckpt_file)
+    print('start loading finetune ckpt:', ckpt_file)
     param_dict = load_checkpoint(ckpt_file)
-    if param_dict:        
+    if param_dict:
         param_not_load = load_param_into_net(net, param_dict)
         print("==========param not load==========:", param_not_load)
-        print('load distributed ckpt finished:', ckpt_file)
+        print('load finetune ckpt finished:', ckpt_file)
 
 def load_distributed_pretrain_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name):
     ckpt_id = rank_id % ckpt_size
@@ -200,6 +186,22 @@ def load_distributed_pretrain_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name
         param_not_load = load_param_into_net(net, param_dict)
         print("==========param not load==========:", param_not_load)
         print('load distributed pretrain ckpt finished:', ckpt_file)
+
+def load_distributed_finetune_ckpt(net, rank_id, ckpt_size, ckpt_path, ckpt_name):
+    ckpt_id = rank_id % ckpt_size
+    folder = "rank_" + str(ckpt_id)
+    if not ckpt_path or not ckpt_name:
+        return
+    ckpt_file = os.path.join(ckpt_path, folder, ckpt_name)
+    if not os.path.exists(ckpt_file):
+        print(f"ckpt_file:{ckpt_file} does not exists")
+        return
+    print('start loading distributed finetune ckpt:', ckpt_file)
+    param_dict = load_checkpoint(ckpt_file)
+    if param_dict:        
+        param_not_load = load_param_into_net(net, param_dict)
+        print("==========param not load==========:", param_not_load)
+        print('load distributed finetune ckpt finished:', ckpt_file)
 
 class LearningRate(LearningRateSchedule):
     """ LearningRate """
@@ -238,9 +240,28 @@ class LearningRate(LearningRateSchedule):
             lr = decay_lr
         return lr
 
+class Profiler(ms.Callback):
+    def __init__(self, start_step, stop_step):
+        super(Profiler, self).__init__()
+        self.start_step = start_step
+        self.stop_step = stop_step
+        self.profiler = ms.Profiler(start_profile=False)
+    def step_begin(self, run_context):
+        cb_params = run_context.original_args()
+        step_num = cb_params.cur_step_num
+        if step_num == self.start_step:
+            self.profiler.start()
+    def step_end(self, run_context):
+        cb_params = run_context.original_args()
+        step_num = cb_params.cur_step_num
+        if step_num == self.stop_step:
+            self.profiler.stop()
+    def end(self, run_context):
+        self.profiler.analyse()
+
 def main(opts):
     # init
-    (local_rank, rank_id, callback_size, new_epoch, ds, dataset_size) = init_env(opts)
+    (local_rank, rank_id, callback_size, epochs, ds, dataset_size) = init_env(opts)
 
     # create model
     net_with_loss = UniterThreeForPretrainingForRetFinetune(opts.model_config, img_dim=IMG_DIM,
@@ -262,7 +283,7 @@ def main(opts):
                                                            scale_sense=update_cell, parallel_config=ParallelConfig)
 
     # set callbacks
-    callback = [TimeMonitor(callback_size), LossMonitor(callback_size)]
+    callbacks = [TimeMonitor(callback_size), LossMonitor(callback_size)]
     
     # path to save ckpt
     if not opts.save_checkpoint_steps:
@@ -276,31 +297,33 @@ def main(opts):
                                     keep_checkpoint_max=1,
                                     integrated_save=False)
     ckpoint_cb = ModelCheckpoint(prefix="OPT_ret",
-                                    directory=ckpt_dir,
-                                    config=config_ck)
-    callback.append(ckpoint_cb)
+                                 directory=ckpt_dir,
+                                 config=config_ck)
+    callbacks.append(ckpoint_cb)
     
     # modify summary callback
     if opts.save_summary:
         specified = {"collect_metric": True, "collect_graph": True, "collect_dataset_graph": True}
         summary_collector = SummaryCollector(summary_dir=os.path.join(opts.output_dir, 'summary'), 
         collect_specified_data=specified, collect_freq=1, keep_default_action=False, collect_tensor_freq=200)
-        callback.append(summary_collector)
+        callbacks.append(summary_collector)
+    
+    # callbacks.append(Profiler(1, 5))
     
     # build model
     model = Model(net_with_grads)
-    if opts.dataset_sink_mode:
-        print("start building...")
-        model.build(train_dataset=ds, sink_size=callback_size, epoch=new_epoch)
     
     # load ckpt
-    load_ckpt(net_with_loss, opts.ckpt_file)
     load_pretrain_ckpt(net_with_loss, opts.pretrain_ckpt_file)
-    load_distributed_ckpt(net_with_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.ckpt_name)
+    load_finetune_ckpt(net_with_loss, opts.finetune_ckpt_file)
+    if opts.dataset_sink_mode:
+        print("start building...")
+        model.build(train_dataset=ds, sink_size=callback_size, epoch=epochs)
     load_distributed_pretrain_ckpt(net_with_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.pretrain_ckpt_name)
+    load_distributed_finetune_ckpt(net_with_loss, rank_id, opts.ckpt_size, opts.ckpt_path, opts.finetune_ckpt_name)
 
     print("start training...")
-    model.train(new_epoch, ds, callbacks=callback, dataset_sink_mode=opts.dataset_sink_mode, sink_size=callback_size)
+    model.train(epochs, ds, callbacks=callbacks, dataset_sink_mode=opts.dataset_sink_mode, sink_size=callback_size)
 
 def str2bool(b):
     if b.lower() in ["false"]:
@@ -314,7 +337,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default="", help='JSON config files')
     parser.add_argument('--output_dir', default="", type=str, help='output directory')
-    parser.add_argument('--callback_size', default=100, type=int, help='callback size.')
+    parser.add_argument('--callback_size', default=1, type=int, help='callback size.')
     parser.add_argument('--dataset_sink_mode', default=False, type=str2bool, help='dataset sink mode')
     parser.add_argument('--save_summary', default=False, type=str2bool, help='save summary')
     parser.add_argument("--start_learning_rate", default=2.5e-5, type=float,
@@ -351,18 +374,20 @@ if __name__ == "__main__":
                         type=float, help="loss scale factor")
     parser.add_argument("--scale_window", default=1000,
                         type=float, help="scale window")
-    parser.add_argument("--ckpt_file", default=None,
-                        type=str, help="ckpt file path to load")
+    
     parser.add_argument("--pretrain_ckpt_file", default=None,
-                        type=str, help="pretrain ckpt file path to load")
+                        type=str, help="pretrain ckpt file path")
+    parser.add_argument("--finetune_ckpt_file", default=None,
+                        type=str, help="finetune ckpt file path")
     parser.add_argument("--ckpt_size", default=32,
-                        type=int, help="distribute ckpt nums to load")
+                        type=int, help="distribute ckpt nums")
     parser.add_argument("--ckpt_path", default=None,
-                        type=str, help="distribute ckpt path to load")
-    parser.add_argument("--ckpt_name", default=None,
-                        type=str, help="distribute ckpt name to load")
+                        type=str, help="distribute ckpt path")
     parser.add_argument("--pretrain_ckpt_name", default=None,
-                        type=str, help="distribute pretrain ckpt name to load")
+                        type=str, help="distribute pretrain ckpt name")
+    parser.add_argument("--finetune_ckpt_name", default=None,
+                        type=str, help="distribute finetune ckpt name")
+    
     parser.add_argument("--save_checkpoint_steps",
                         default=0, type=int, help="save checkpoint steps")
     parser.add_argument("--epochs", default=3,

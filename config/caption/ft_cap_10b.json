@@ -1,5 +1,5 @@
 {
-  "model_config": "config/retrieval/cross_modal_encoder_config_vit448_type0.json",
+  "model_config": "config/caption/cross_modal_encoder_base.json",
   "mrm_prob": 0.15,
   "itm_neg_prob": 0.5,
   "itm_ot_lambda": 0.1,
@@ -9,11 +9,12 @@
   "min_bb": 10,
   "num_bb": 36,
   "train_batch_size": 12,
-  "val_batch_size": 40,
+  "val_batch_size": 10,
   "full_batch": true,
-  "tensor_shard_size": 4,
-  "enable_parallel_optimizer": false,
-  "optimizer_shard_size": 1,
+  "tensor_shard_size": 8,
+  "enable_parallel_optimizer": true,
+  "optimizer_shard_size": 4,
+  "beam_width": 1,
   "optim": "adamw",
   "betas": [
     0.9,
@@ -27,49 +28,50 @@
   "fp16": true,
   "n_workers": 12,
   "pin_mem": true,
-  "vocab_path": "dataset/retrieval/ids_to_tokens_zh.json",
+  "vocab_path": "dataset/caption/ids_to_tokens_zh.json",
   "use_validate": false,
   "show_time": true,
   "use_vit": true,
   "use_patch": true,
   "patch_size": 32,
   "image_size": 448,
-  "ids_train_path": "dataset/retrieval/train/mscoco_train_three.json",
+  "ids_train_path": "dataset/caption/train/train_coco_v2.json",
   "train_datasets": [
     {
-      "name": "open",
+      "name": "coco",
       "db": [
-        "dataset/retrieval/train/txt"
+        "dataset/caption/train/txt"
       ],
       "img": [
-        "dataset/retrieval/train/img"
+        "dataset/caption/train/img"
       ],
       "audio": [
-        "dataset/retrieval/train/aud"
+        "dataset/caption/train/aud"
       ],
       "tasks": [
-        "ftRet"
+        "ftCap"
       ],
       "mix_ratio": [
         1
       ]
     }
   ],
-  "ids_val_path": "dataset/retrieval/val/mscoco_val_three_150.json",
+  "caption_eval_gt": "dataset/caption/val/coco_trans_captions.json",
+  "ids_val_path": "dataset/caption/val/val_coco_v2.json",
   "val_datasets": [
     {
-      "name": "open",
+      "name": "coco",
       "db": [
-        "dataset/retrieval/train/txt"
+        "dataset/caption/train/txt"
       ],
       "img": [
-        "dataset/retrieval/train/img"
+        "dataset/caption/train/img"
       ],
       "audio": [
-        "dataset/retrieval/train/aud"
+        "dataset/caption/train/aud"
       ],
       "tasks": [
-        "ret_t2i"
+        "ftCap"
       ]
     }
   ]

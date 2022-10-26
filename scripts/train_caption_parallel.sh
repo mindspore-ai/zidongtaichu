@@ -2,7 +2,7 @@
 
 output_dir="output/caption"
 task_name="finetune_caption"
-task_config_file="ft_cap_base.json"
+task_config_file="ft_cap_1b.json"
 
 if [ $# != 3 ]
 then
@@ -62,6 +62,5 @@ do
         --pretrain_ckpt_file=model/caption/OPT_1-38_136.ckpt \
         --output_dir=$output_dir/$task_name \
         --use_parallel=True \
-        --data_url="a" --train_url="a" \
         > $output_dir/$task_name/rank_$i/log_train 2>&1 &
 done

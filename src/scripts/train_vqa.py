@@ -33,7 +33,6 @@ from src.model_mindspore.vqa import UniterThreeForPretrainingForVQAFinetune
 from src.model_mindspore.utils import LearningRate
 from src.model_mindspore.utils import LossSummaryCallbackLocal
 from src.model_mindspore.parallel_transformer import ParallelConfig
-from src.tools.const import IMG_LABEL_DIM, AUDIO_LABEL_DIM
 from src.config.config import *
 from src.tools.misc import parse_with_config, set_random_seed
 from src.tools.monitor import LossMonitorSingleTask

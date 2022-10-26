@@ -21,9 +21,9 @@ import mindspore.nn as nn
 from mindspore.ops import operations as P
 from mindspore.common.tensor import Tensor
 from mindspore.ops.primitive import constexpr
-from .parallel_transformer import Dropout, TransformerEncoder, TransformerDecoder, VocabEmbedding, \
+from .parallel_transformer import Dropout, ParallelConfig, TransformerEncoder, TransformerDecoder, VocabEmbedding, \
     set_parallel_configure_for_layer, BertAttentionMaskWithoutLen
-from .beam_search import BeamSearchDecoder, TileBeam
+from .beam_search import BeamSearchDecoder, TileBeam, TileBeam1
 from src.config import config
 
 class TransformerConfig:
@@ -239,12 +239,12 @@ class CreateAttentionMaskFromInputMask(nn.Cell):
         config (:class:`TransformerConfig`): Configuration for Transformer.
     """
 
-    def __init__(self):
+    def __init__(self, parallel_config=ParallelConfig):
         super(CreateAttentionMaskFromInputMask, self).__init__()
         self.cast = P.Cast()
         self.reshape = P.Reshape()
         self.shape = P.Shape()
-        self.batch_matmul = P.BatchMatMul()
+        self.batch_matmul = P.BatchMatMul().shard(((parallel_config.dp, 1, 1), (parallel_config.dp, 1, 1)))
 
     def construct(self, input_mask):
         """Create attention mask according to input mask."""
@@ -272,7 +272,8 @@ class TransformerDecoderStep(nn.Cell):
         num_hidden_layers (int): Number of hidden layers in encoder cells.
         num_attention_heads (int): Number of attention heads in encoder cells. Default: 16.
         intermediate_size (int): Size of intermediate layer in encoder cells. Default: 4096.
-        attention_probs_dropout_prob (float): The dropout probability for
+        attention_probs_dropout_prob (float): The dropout probability f
+        or
                                       SelfAttention. Default: 0.1.
         use_one_hot_embeddings (bool): Specifies whether to use one hot encoding form. Default: False.
         initializer_range (float): Initialization value of TruncatedNormal. Default: 0.02.
@@ -324,19 +325,23 @@ class TransformerDecoderStep(nn.Cell):
                                               lambda_func=lambda_func,
                                               offset=(1 + offset) * parallel_config.fusion_group)
 
-        self.ones_like = P.OnesLike()
         self.shape = P.Shape()
-
-        self._create_attention_mask_from_input_mask = CreateAttentionMaskFromInputMask()
-        self.expand = P.ExpandDims()
-        self.multiply = P.Mul()
-        self.tile = P.Tile()
+        self.strided_slice2 = P.StridedSlice().shard(((1, 1),))
+        self.strided_slice3 = P.StridedSlice().shard(((parallel_config.dp, 1, 1),))
+        self._create_attention_mask_from_input_mask = CreateAttentionMaskFromInputMask(parallel_config=parallel_config)
+        self.ones_like = P.OnesLike().shard(((parallel_config.dp, 1),))
+        self.expand = P.ExpandDims().shard(((1, 1),))
+        self.expand1 = P.ExpandDims().shard(((parallel_config.dp, 1, 1),))
+        self.multiply = P.Mul().shard(((parallel_config.dp, 1, 1), (1, 1, 1)))
+        self.tile = P.Tile().shard(((parallel_config.dp, 1, 1, 1),))
+        self.max_decode_length = max_decode_length
         ones = np.ones(shape=(max_decode_length, max_decode_length))
         self.future_mask = Tensor(np.tril(ones), dtype=mstype.float32)
 
         self.cast_compute_type = CastWrapper(dst_type=compute_type)
         self.beam_width = beam_width
-        self.tile_beam = TileBeam(beam_width=self.beam_width)
+        self.hidden_size = hidden_size
+        self.tile_beam = TileBeam(beam_width=self.beam_width, parallel_config=parallel_config)
 
     # def construct(self, input_ids, enc_states, source_mask, seq_length):
     def construct(self, input_ids, enc_states, source_mask, index=None): # setting index when generating with fixed shape
@@ -351,12 +356,14 @@ class TransformerDecoderStep(nn.Cell):
 
         input_shape = self.shape(input_ids)
         input_len = input_shape[1]
-        future_mask = self.future_mask[0:input_len:1, 0:input_len:1]
+        # future_mask = self.future_mask[0:input_len:1, 0:input_len:1]
+        future_mask = self.strided_slice2(self.future_mask, (0, 0), (input_len, input_len), (1, 1)) # [input_len, input_len]
+        future_mask = self.expand(future_mask, 0) # [1, input_len, input_len]
 
-        input_mask = self.ones_like(input_ids)
-        input_mask = self._create_attention_mask_from_input_mask(input_mask)
-        input_mask = self.multiply(input_mask, self.expand(future_mask, 0))
-        input_mask = self.expand(input_mask, 1)
+        input_mask = self.ones_like(input_ids)  # [batch_size, input_len]
+        input_mask = self._create_attention_mask_from_input_mask(input_mask) # [batch_size, input_len, input_len]
+        input_mask = self.multiply(input_mask, future_mask) # [batch_size, input_len, input_len]
+        input_mask = self.expand1(input_mask, 1) # [batch_size, 1, input_len, input_len]
         # input_mask = self.tile(input_mask, (1, input_ids.shape[1], 1, 1))
         input_mask = self.cast_compute_type(input_mask)
         # print(enc_attention_mask.shape)
@@ -375,7 +382,12 @@ class TransformerDecoderStep(nn.Cell):
         # take the last step
         if index is None:
             index = input_len
-        decoder_output = decoder_output[::, index - 1:index:1, ::]
+        output_shape = self.shape(decoder_output)
+        # P.Print()(decoder_output)
+        decoder_output = self.strided_slice3(decoder_output, (0, index-1, 0), (output_shape[0], index, self.hidden_size), (1, 1, 1))
+        # P.Print()(decoder_output1)
+        # decoder_output2 = decoder_output[::, index - 1:index:1, ::]
+        # P.Print()(decoder_output2)
 
         # projection and log_prob
         log_probs = self.projection(decoder_output, embedding_tables, 1)
@@ -516,7 +528,7 @@ class TransformerModel(nn.Cell):
                 sos_id=0, eos_id=0, task=task)
 
             self.tfm_decoder.add_flags(loop_can_unroll=True)
-            self.tile_beam = TileBeam(beam_width=self.beam_width)
+            self.tile_beam = TileBeam1(beam_width=self.beam_width)
 
         self.cast = P.Cast()
         self.dtype = config.dtype
@@ -531,9 +543,8 @@ class TransformerModel(nn.Cell):
         self.LinearEmbedding.bias.parallel_optimizer = False
         self.tile = P.Tile().shard(((parallel_config.dp, 1, 1, 1),))
         self.zeros = P.Zeros()
-        self.concat = P.Concat(axis=1)
-        # self.tile_beam = TileBeam(beam_width=self.beam_width)
-        self.stride_slice_2 = P.StridedSlice().shard(((1, 1),))
+        self.concat = P.Concat(axis=1).shard(((parallel_config.dp, 1), (parallel_config.dp, 1)))
+        self.stride_slice_2 = P.StridedSlice().shard(((parallel_config.dp, 1),))
 
 
     def construct(self, sequence_output, source_mask, target_ids=None, target_mask=None):
@@ -552,12 +563,9 @@ class TransformerModel(nn.Cell):
         if not self.is_training:
             beam_encoder_output = self.tile_beam(encoder_output)
             seq_length = 30
-
-
             predicted_ids = self.tfm_decoder(beam_encoder_output, source_mask)
             ret = predicted_ids
         else:
-
             bos_sequence = self.zeros((target_ids.shape[0]), target_ids.dtype)
             bos_sequence = self.expand(bos_sequence, 1)
 
