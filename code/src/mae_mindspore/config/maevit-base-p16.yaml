@@ -1,0 +1,61 @@
+# model config
+encoder_layers: 12
+encoder_num_heads: 12
+encoder_dim: 768
+decoder_layers: 8
+decoder_num_heads: 16
+decoder_dim: 512
+mlp_ratio: 4
+masking_ratio: 0.75
+
+# context config
+seed: 2022
+use_parallel: True
+context:
+    mode: 0 #0--Graph Mode; 1--Pynative Mode
+    device_target: "Ascend"
+    max_call_depth: 10000
+    save_graphs: False
+    device_id: 7
+
+# dataset base
+dataset_name: "imagenet"
+
+# train dataset
+dataset_path: "/mnt/vision/ImageNet1K/CLS-LOC/train"
+# dataset_path: "/mnt/vision/ImageNet21K/winter21_whole_untar/"
+train_num_workers: 14
+interpolation: "BILINEAR"
+train_image_size: 224
+autoaugment: False
+crop_min: 0.2
+mixup: 0.0
+
+# train config
+epoch: 800
+batch_size: 64
+patch_size: 16
+sink_mode: True
+per_step_size: 0
+
+# loss manger
+loss_scale: 4096
+scale_factor: 2
+scale_window: 1000
+
+# optimizer
+beta1: 0.9
+beta2: 0.95
+weight_decay: 0.05
+
+# lr sechdule
+start_learning_rate: 0.0024
+end_learning_rate: 0.000001
+warmup_epochs: 40
+
+# callback
+cb_size: 1
+save_ckpt_epochs: 10
+ckpt_save_dir: "/cache/ckpt"
+prefix: "MAEVIT-B"
+obs_dir: "obs://muti-modal/mae-vit-base-p16/V2/lr2.4e-3"

@@ -1,0 +1,80 @@
+{
+  "model_config": "config/retrieval/cross_modal_encoder_config_vit448_type0_bs9.json",
+  "mrm_prob": 0.15,
+  "itm_neg_prob": 0.5,
+  "itm_ot_lambda": 0.1,
+  "max_txt_len": 60,
+  "conf_th": 0.2,
+  "max_bb": 100,
+  "min_bb": 10,
+  "num_bb": 36,
+  "train_batch_size": 3,
+  "val_batch_size": 10,
+  "gradient_accumulation_steps": 1,
+  "learning_rate": 2.5e-05,
+  "start_learning_rate": 2.5e-05,
+  "end_learning_rate": 1e-08,
+  "decay_steps": 20000,
+  "valid_steps": 1000,
+  "num_train_steps": 100000,
+  "optim": "adamw",
+  "betas": [
+    0.9,
+    0.98
+  ],
+  "dropout": 0.1,
+  "weight_decay": 0.01,
+  "grad_norm": 5.0,
+  "warmup_steps": 1000,
+  "seed": 42,
+  "fp16": true,
+  "n_workers": 12,
+  "pin_mem": true,
+  "vocab_path": "ids_to_tokens_zh.json",
+  "use_validate": false,
+  "show_time": true,
+    "use_vit": true,
+  "use_patch": true,
+  "patch_size": 32,
+    "image_size": 448,
+    "ids_train_path": "train/mscoco_train_three.json",
+    "train_datasets": [
+      {
+        "name": "open",
+        "db": [
+          "train/txt"
+        ],
+        "img": [
+          "train/img"
+        ],
+        "audio": [
+          "train/aud"
+        ],
+        "tasks": [
+          "ftRet"
+        ],
+        "mix_ratio": [
+          1
+        ]
+      }
+    ],
+    "ids_val_path": "val/mscoco_val_three_150.json",
+    "val_datasets": [
+      {
+        "name": "open",
+        "db": [
+          "train/txt"
+        ],
+        "img": [
+          "train/img"
+        ],
+        "audio": [
+          "train/aud"
+        ],
+        "tasks": [
+          "ret_t2i"
+        ]
+      }
+    ]
+  }
+  

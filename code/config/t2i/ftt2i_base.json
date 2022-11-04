@@ -1,0 +1,77 @@
+{
+    "epochs": 100,
+    "train_batch_size": 12,
+    "val_batch_size": 12,
+    "image_token_len": 256,
+    "image_codebook_size": 8192,
+    "decoder_hidden_size": 512,
+    "decoder_num_layers": 6,
+    "decoder_attn_heads": 8,
+    "beam_width": 1,
+    "gradient_accumulation_steps": 1,
+    "start_learning_rate": 5e-05,
+    "valid_steps": 5000,
+    "decay_steps": 100000,
+    "save_checkpoint_steps": 5000,
+    "optim": "adamw",
+    "model_config": "./config/t2i/uniter-base-three.json",
+    "output_dir": "",
+    "mrm_prob": 0.15,
+    "itm_neg_prob": 0.5,
+    "itm_ot_lambda": 0.1,
+    "max_txt_len": 50,
+    "conf_th": 0.2,
+    "max_bb": 100,
+    "min_bb": 10,
+    "num_bb": 36,
+    "betas": [
+        0.9,
+        0.98
+    ],
+    "dropout": 0.1,
+    "weight_decay": 0.01,
+    "grad_norm": 5.0,
+    "warmup_steps": 1000,
+    "seed": 42,
+    "fp16": true,
+    "n_workers": 4,
+    "pin_mem": true,
+    "vocab_path": "./datasets/txt2img/mscoco/cocodata_zh/ids_to_tokens_zh.json",
+    "use_validate": false,
+    "use_img_output": true,
+    "use_audio_output": true,
+    "data_type": 2,
+    "show_time": true,
+    "name_txt": "id2len_two_mscoco.json",
+    "name_img": "img2len_two.json",
+    "name_txt_only": "none",
+    "caption_eval_gt" : "./datasets/txt2img/mscoco/cocodata_zh/captions_test5k.json",
+    "img_token_path": "./datasets/txt2img/mscoco/tokens_128x/",
+    "ids_train_path": "./datasets/txt2img/mscoco/cocodata_zh/train_coco_t2i.json",
+    "train_datasets": [
+        {
+            "name": "coco",
+            "db": [
+                "./datasets/txt2img/mscoco/cocodata_zh"
+            ],
+            "tasks": [
+                "ftT2I"
+            ],
+            "mix_ratio": [
+                1
+            ]
+        }
+    ],
+    "ids_val_path": "./datasets/txt2img/mscoco/cocodata_zh/valid_coco_t2i.json",
+    "val_datasets": [
+        {
+            "name": "coco",
+            "db": [
+                "./datasets/txt2img/mscoco/cocodata_zh"
+            ],
+            "tasks": [
+                "ftT2I"
+            ]
+        }
+    ]
+}

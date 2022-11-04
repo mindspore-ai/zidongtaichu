@@ -1,0 +1,5 @@
+params:
+  start_learning_rate: 1e-5
+  end_learning_rate: 1e-7
+  epochs: 10
+  decay_epochs: 10

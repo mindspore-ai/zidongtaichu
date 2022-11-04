@@ -1,0 +1,22 @@
+scenario:
+  modelarts:
+    # ��������region����
+    iam_endpoint: https://iam-pub.cn-central-221.ovaijisuan.com
+    obs_endpoint: https://obs.cn-central-221.ovaijisuan.com
+    modelarts_endpoint: https://modelarts.cn-central-221.ovaijisuan.com
+    region_name: cn-central-221
+    project_id:
+
+	  # ��ҵ�������
+    boot_file: obs://HwAiUser/omni-perception-pretrainer/src/scripts/test_caption.py
+    code_url: obs://HwAiUser/omni-perception-pretrainer/code/
+    data_path: obs://HwAiUser/omni-perception-pretrainer/dataset/data/
+    ckpt_path: obs://HwAiUser/omni-perception-pretrainer/pretrained_model/  # ����ģ���ļ�·����Ĭ��ΪԤѵ��ģ��
+    log_path: obs://HwAiUser/omni-perception-pretrainer/output/
+    output_path: obs://HwAiUser/omni-perception-pretrainer/output/
+    user_image_url:   # SWR�����ַ
+
+    # ������Դ����
+    pool_id: # ר����Դ��id, ������Դ��ΪNone
+    node_num: 1
+    device_num: 1  # caption��������ǰֻ֧�ֵ���

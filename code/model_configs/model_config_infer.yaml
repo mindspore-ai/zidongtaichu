@@ -1,0 +1,3 @@
+params:
+  beam_width: 5
+  ckpt_file: OPT_1-38_136.ckpt
