@@ -25,6 +25,7 @@ from mindspore.train.model import Model
 from pathlib2 import Path
 
 import sys
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..")))
 from src.data import create_dataset
 from src.model_mindspore.cell_wrapper import ParallelTrainOneStepWithLossScaleCell, TrainOneStepWithLossScaleCell
@@ -111,6 +112,7 @@ def init_env(opts):
 
     return local_rank, rank_id, callback_size, strategy_ckpt_save_file, device_id, device_num, new_epoch, ds, dataset_size
 
+
 def load_ckpt(net, ckpt_file):
     if not ckpt_file:
         return
@@ -120,6 +122,7 @@ def load_ckpt(net, ckpt_file):
         param_not_load = load_param_into_net(net, param_dict)
         print("param not load:", param_not_load)
     print(f"end loading ckpt:{ckpt_file}")
+
 
 def load_pretrain_ckpt(net, ckpt_file):
     if not ckpt_file:
@@ -134,6 +137,7 @@ def load_pretrain_ckpt(net, ckpt_file):
         print("param not load:", param_not_load)
     print(f"end loading ckpt:{ckpt_file}")
 
+
 def load_vit_ckpt(net, vit_ckpt_file):
     if not vit_ckpt_file:
         return
@@ -141,18 +145,19 @@ def load_vit_ckpt(net, vit_ckpt_file):
     param_dict = load_checkpoint(vit_ckpt_file)
     if param_dict:
         param_dict = {}
-        for k,v in param_dict.items():
-            if k.startswith('encoder.'):        #vit 448
+        for k, v in param_dict.items():
+            if k.startswith('encoder.'):  # vit 448
                 param_dict['uniter.img_embeddings.vit.' + k[8:]] = v
         param_not_load = load_param_into_net(net.uniter.img_embeddings.vit, param_dict)
         print("param not load:", param_not_load)
     print(f"end loading img-encoder:{vit_ckpt_file}")
 
+
 def main(opts):
     (local_rank, rank_id, callback_size, _, _, _,
      new_epoch, ds, dataset_size) = init_env(opts)
     opts.batch_size = opts.train_batch_size
-    net_with_loss = UniterThreeForPretrainingForCapFinetune(opts.model_config, img_dim=opts.img_dim,   
+    net_with_loss = UniterThreeForPretrainingForCapFinetune(opts.model_config, img_dim=opts.img_dim,
                                                             audio_dim=opts.audio_dim,
                                                             use_txt_out=opts.use_txt_out, use_video=opts.use_video,
                                                             full_batch=opts.full_batch, use_moe=opts.use_moe,
@@ -169,8 +174,8 @@ def main(opts):
 
     load_ckpt(net_with_loss, opts.ckpt_file.strip())
     load_vit_ckpt(net_with_loss, opts.vit_ckpt_file.strip())
-    if opts.pretrained_model_file_path:
-        load_pretrain_ckpt(net_with_loss, os.path.join(opts.pretrained_model_file_path, opts.pretrained_model_file))
+    if opts.pretrained_model_path:
+        load_pretrain_ckpt(net_with_loss, os.path.join(opts.pretrained_model_path, opts.pretrained_model_file))
 
     if not opts.decay_steps:
         opts.decay_steps = opts.decay_epochs * dataset_size
@@ -181,11 +186,11 @@ def main(opts):
                                              scale_factor=opts.loss_scale_factor,
                                              scale_window=opts.scale_window)
     if opts.use_parallel:
-        net_with_grads = ParallelTrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer, 
-        scale_sense=update_cell, parallel_config=ParallelConfig)                
-    else:                                                    
-        net_with_grads = TrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer, 
-        scale_sense=update_cell)
+        net_with_grads = ParallelTrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer,
+                                                               scale_sense=update_cell, parallel_config=ParallelConfig)
+    else:
+        net_with_grads = TrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer,
+                                                       scale_sense=update_cell)
     model = Model(net_with_grads)
 
     print("init callback")
@@ -193,11 +198,12 @@ def main(opts):
     # modify summary callback
     if opts.save_summary:
         specified = {"collect_metric": True, "collect_graph": True, "collect_dataset_graph": True}
-        summary_collector = SummaryCollector(summary_dir=os.path.join(opts.output_path, 'summary'), 
-        collect_specified_data=specified, collect_freq=1, keep_default_action=False, collect_tensor_freq=200)
+        summary_collector = SummaryCollector(summary_dir=os.path.join(opts.output_path, 'summary'),
+                                             collect_specified_data=specified, collect_freq=1,
+                                             keep_default_action=False, collect_tensor_freq=200)
         callback.append(summary_collector)
     # modify check point callback
-    if rank_id == 0:    
+    if rank_id == 0:
         if not opts.save_checkpoint_steps:
             opts.save_checkpoint_steps = dataset_size
         ckpt_dir = os.path.join(opts.output_path, "ckpt", f"rank_{str(local_rank)}")
@@ -214,12 +220,14 @@ def main(opts):
     print("start_training...")
     model.train(new_epoch, ds, callbacks=callback, dataset_sink_mode=opts.dataset_sink_mode, sink_size=callback_size)
 
+
 def str2bool(b):
     if b.lower() not in ["false", "true"]:
         raise Exception("Invalid Bool Value")
     if b.lower() in ["false"]:
         return False
     return True
+
 
 if __name__ == "__main__":
     print('process id:', os.getpid())
@@ -230,7 +238,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_path', default="", type=str, help='use audio out')
     parser.add_argument('--ckpt_file', default="", type=str, help='use txt out')
     parser.add_argument('--vit_ckpt_file', default="", type=str, help='use txt out')
-    parser.add_argument('--pretrained_model_file_path', default="", type=str, help='use txt out')
+    parser.add_argument('--pretrained_model_path', default="", type=str, help='use txt out')
     parser.add_argument('--pretrained_model_file', default='OPT_1-38_136.ckpt', help='default pretrained model file')
 
     parser.add_argument("--start_learning_rate", default=1e-5, type=float,
@@ -241,7 +249,7 @@ if __name__ == "__main__":
                         help="lr decay steps.")
     parser.add_argument("--decay_epochs", default=10, type=int, help="lr decay epochs.")
     parser.add_argument("--epochs", default=10, type=int, help="")
-    
+
     parser.add_argument('--callback_size', default=100, type=int, help='callback size.')
     parser.add_argument('--dataset_sink_mode', default=False, type=str2bool, help='dataset sink mode')
     parser.add_argument("--save_checkpoint_steps", default=0, type=int, help="")
@@ -249,7 +257,7 @@ if __name__ == "__main__":
     parser.add_argument("--full_batch", default=False, type=bool, help="")
     parser.add_argument('--use_parallel', default=False, type=str2bool, help='use txt out')
     parser.add_argument('--display_net', default=False, type=str2bool, help='use txt out')
-    
+
     parser.add_argument('--use_txt_out', default=False, type=str2bool, help='use txt out')
     parser.add_argument('--use_video', default=False, type=str2bool, help='use txt out')
     parser.add_argument('--data_type', default=2, type=int, help='use txt out')
@@ -273,7 +281,8 @@ if __name__ == "__main__":
     parser.add_argument('--use_vit', default=True, type=str2bool, help='use txt out')
     parser.add_argument('--use_patch', default=True, type=str2bool, help='use txt out')
 
-    parser.add_argument('--advanced_config', default="", type=str, help="model_config_file_path")
+    parser.add_argument('--advanced_config', default="", type=str,
+                        help="model config file path used for freeze model layers")
 
     args = parse_with_config(parser)
     print(args)

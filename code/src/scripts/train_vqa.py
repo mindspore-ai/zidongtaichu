@@ -25,6 +25,7 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from pathlib2 import Path
 
 import sys
+
 sys.path.append('')
 from data import create_dataset
 from src.model_mindspore.cell_wrapper import TrainOneStepWithLossScaleCell
@@ -38,6 +39,7 @@ from config.config import *
 from src.tools.misc import parse_with_config, set_random_seed
 from src.tools.monitor import LossMonitorSingleTask
 from src.scripts.freeze_model_utils import get_freeze_layers, freeze_model
+
 
 def init_env(opts):
     """ init_env """
@@ -119,6 +121,7 @@ def init_env(opts):
 
     return local_rank, rank_id, callback_size, strategy_ckpt_save_file, device_id, device_num, new_epoch, ds, dataset_size
 
+
 def load_ckpt(net, ckpt_file):
     if not ckpt_file:
         return
@@ -133,10 +136,12 @@ def load_ckpt(net, ckpt_file):
             new_params_dict[key] = params_dict[key]
         new_params_dict["uniter.img_embeddings.img_linear.weight"] = new_params_dict["feat_regress.weight"]
         new_params_dict["uniter.audio_embeddings.audio_linear.weight"] = new_params_dict["audio_feat_regress.weight"]
-        new_params_dict["uniter.embeddings.word_embeddings.embedding_table"] = new_params_dict["cls.predictions.decoder.weight"]
+        new_params_dict["uniter.embeddings.word_embeddings.embedding_table"] = new_params_dict[
+            "cls.predictions.decoder.weight"]
         param_not_load = load_param_into_net(net, new_params_dict)
         print("param not load:", param_not_load)
     print(f"end loading ckpt:{ckpt_file}")
+
 
 def load_vit_ckpt(net, vit_ckpt_file):
     if not vit_ckpt_file:
@@ -145,12 +150,13 @@ def load_vit_ckpt(net, vit_ckpt_file):
     vit_dict = load_checkpoint(vit_ckpt_file)
     if vit_dict:
         param_dict = {}
-        for k,v in vit_dict.items():
-            if k.startswith('encoder.'):        #vit 448
+        for k, v in vit_dict.items():
+            if k.startswith('encoder.'):  # vit 448
                 param_dict['uniter.img_embeddings.vit.' + k[8:]] = v
         param_not_load = load_param_into_net(net.uniter.img_embeddings.vit, param_dict)
         print("param not load:", param_not_load)
     print(f"end loading img-encoder:{vit_ckpt_file}")
+
 
 def main(opts):
     (local_rank, _, callback_size, _, _, _,
@@ -167,10 +173,10 @@ def main(opts):
     if advanced_config_path:
         freeze_layers = get_freeze_layers(advanced_config_path)
         freeze_model(net_with_loss, freeze_layers)
-    if(opts.pretrained_model_file_path):
-        load_ckpt(net_with_loss, os.path.join(opts.pretrained_model_file_path.strip(), opts.pretrained_model_file.strip()))
+    if opts.pretrained_model_path:
+        load_ckpt(net_with_loss, os.path.join(opts.pretrained_model_path.strip(), opts.pretrained_model_file.strip()))
     load_vit_ckpt(net_with_loss, opts.vit_ckpt_file.strip())
-    
+
     if not opts.decay_steps:
         opts.decay_steps = opts.decay_epochs * dataset_size
     lr = LearningRate(opts.start_learning_rate, opts.end_learning_rate, opts.warmup_steps, opts.decay_steps)
@@ -181,19 +187,19 @@ def main(opts):
                                              scale_window=opts.scale_window)
     net_with_grads = TrainOneStepWithLossScaleCell(net_with_loss, optimizer=optimizer,
                                                    scale_sense=update_cell)
-    callback = [TimeMonitor(callback_size), LossMonitorSingleTask(callback_size,verbose=False)]
+    callback = [TimeMonitor(callback_size), LossMonitorSingleTask(callback_size, verbose=False)]
     if local_rank == 0:
         if not opts.save_checkpoint_steps:
             opts.save_checkpoint_steps = dataset_size
         config_ck = CheckpointConfig(save_checkpoint_steps=opts.save_checkpoint_steps,
-                                    keep_checkpoint_max=10,
-                                    integrated_save=False)
+                                     keep_checkpoint_max=10,
+                                     integrated_save=False)
         ckpt_dir = os.path.join(opts.output_path, 'ckpt', f"rank_{str(local_rank)}")
         if not os.path.exists(ckpt_dir):
             Path(ckpt_dir).mkdir(parents=True, exist_ok=True)
         ckpoint_cb = ModelCheckpoint(prefix="OPT_vqa",
-                                    directory=ckpt_dir,
-                                    config=config_ck)
+                                     directory=ckpt_dir,
+                                     config=config_ck)
         callback.append(ckpoint_cb)
         summary_dir = os.path.join(opts.output_path, 'loss_summary')
         callback.append(LossSummaryCallbackLocal(summary_dir=summary_dir,
@@ -204,6 +210,7 @@ def main(opts):
     print("start_training...")
     model.train(new_epoch, ds, callbacks=callback, dataset_sink_mode=opts.dataset_sink_mode, sink_size=callback_size)
 
+
 def str2bool(b):
     if b.lower() in ["false"]:
         output = False
@@ -212,6 +219,7 @@ def str2bool(b):
     else:
         raise Exception("Invalid Bool Value")
     return output
+
 
 if __name__ == "__main__":
     project_root = os.path.abspath(os.path.dirname(os.path.realpath(__file__)) + os.path.sep + "..")
@@ -222,9 +230,9 @@ if __name__ == "__main__":
     real_path = os.path.join(abs_path, "config/vqa/ft_vqa_base.json")
     parser.add_argument('--config', default=real_path, help='JSON config files')
     parser.add_argument('--vit_ckpt_file', default="", type=str)
-    parser.add_argument('--pretrained_model_file_path', default="", type=str)
+    parser.add_argument('--pretrained_model_path', default="", type=str)
     parser.add_argument('--pretrained_model_file', default="OPT_1-38_136.ckpt", type=str)
-    
+
     parser.add_argument("--start_learning_rate", default=1e-5, type=float,
                         help="The initial learning rate for Adam.")
     parser.add_argument("--end_learning_rate", default=1e-7, type=float,
@@ -236,7 +244,7 @@ if __name__ == "__main__":
                         help="The decay step.")
     parser.add_argument("--epochs", default=10, type=int,
                         help="The decay step.")
-    
+
     parser.add_argument('--callback_size', default=100, type=int, help='callback size.')
     parser.add_argument('--dataset_sink_mode', default=False, type=str2bool, help='dataset sink mode')
     parser.add_argument('--use_txt_out', default=False, type=str2bool, help='use txt out')
@@ -258,7 +266,8 @@ if __name__ == "__main__":
     parser.add_argument("--use_moe", default=False, type=bool, help="use moe")
     parser.add_argument("--mode", default="train", type=str)
 
-    parser.add_argument('--advanced_config', default="", type=str, help="model_config_file_path")
+    parser.add_argument('--advanced_config', default="", type=str,
+                        help="model config file path used for freeze model layers")
 
     args = parse_with_config(parser)
     print(args)

@@ -1,12 +1,11 @@
 #!/bin/bash
 
-output_path="{OUTPUT_PATH}"
+data_path="{DATA_PATH}"                                                                             # [need to replace]
+output_path="{OUTPUT_PATH}"                                                                         # [need to replace]
+pretrained_model_path="{HOME}/omni-perception-pretrainer/pretrained_model"                          # [need to replace]
+model_config_path="{HOME}/omni-perception-pretrainer/code/model_configs/model_config_finetune.yaml" # [need to replace]
+boot_file_path="{HOME}/omni-perception-pretrainer/code/src/scripts/train_caption.py"                # [need to replace]
 task_name="finetune_caption"
-task_config_file="ft_cap_base.json"
-data_path="{DATA_PATH}"
-pretrained_model_file_path="{HOME}/omni-perception-pretrainer/model/caption/"
-model_config_file_path="{HOME}/omni-perception-pretrainer/code/model_configs/model_config.yaml"
-boot_file_path="{HOME}/omni-perception-pretrainer/code/src/scripts/train_caption.py"
 
 if [ $# != 3 ]
 then
@@ -60,8 +59,12 @@ do
     export DEVICE_ID=${CANDIDATE_DEVICE[i]}
     mkdir -p ${output_path:?}/${task_name:?}/rank_$i
     echo "start training for rank $RANK_ID, device $DEVICE_ID"
-    nohup tk finetune --quiet --model_config_file_path $model_config_file_path \
+    nohup tk finetune \
+    --quiet \
     --boot_file_path $boot_file_path \
-    --data_path $data_path --output_path $output_path \
+    --data_path $data_path \
+    --output_path $output_path \
+    --model_config_path $model_config_path \
+    --pretrained_model_path $pretrained_model_path \
     > $output_path/$task_name/rank_$i/log_train 2>&1 &
 done
