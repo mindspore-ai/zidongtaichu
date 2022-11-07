@@ -247,8 +247,8 @@ def main(opts):
         freeze_model(net_with_loss, freeze_layers)
     # load ckpt
     load_ckpt(net_with_loss, opts.ckpt_file)
-    if opts.pretrained_model_file_path:
-        load_pretrain_ckpt(net_with_loss, os.path.join(opts.pretrained_model_file_path, opts.pretrain_ckpt_file))
+    if opts.pretrained_model_path:
+        load_pretrain_ckpt(net_with_loss, os.path.join(opts.pretrained_model_path, opts.pretrain_ckpt_file))
 
     # learning rate and optimizer
     lr = LearningRate(opts.start_learning_rate, opts.end_learning_rate, opts.warmup_steps, opts.decay_steps)
@@ -415,10 +415,10 @@ if __name__ == "__main__":
                         type=bool, help="use moe")
     parser.add_argument("--data_path", default=None,
                         type=str, help="data path")
-    parser.add_argument('--pretrained_model_file_path', 
+    parser.add_argument('--pretrained_model_path',
                         default="", type=str, help='use txt out')
     parser.add_argument('--advanced_config', 
-                        default="", type=str, help="model_config_file_path")
+                        default="", type=str, help="model config file path used for freeze model layers")
     parser.add_argument("--ckpt_path", default=None,
                         type=str, help="ckpt file path")
 
