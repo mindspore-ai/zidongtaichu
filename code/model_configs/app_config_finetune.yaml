@@ -1,22 +1,22 @@
 scenario:
-  modelarts:
-    # 计算中心region配置
-    iam_endpoint: https://iam-pub.cn-central-221.ovaijisuan.com
-    obs_endpoint: https://obs.cn-central-221.ovaijisuan.com
-    modelarts_endpoint: https://modelarts.cn-central-221.ovaijisuan.com
-    region_name: cn-central-221
-    project_id:
+    modelarts:
+      # 计算中心region配置
+      iam_endpoint: https://iam-pub.cn-central-221.ovaijisuan.com
+      modelarts_endpoint: https://modelarts.cn-central-221.ovaijisuan.com
+      obs_endpoint: https://obs.cn-central-221.ovaijisuan.com
+      region_name: cn-central-221
+      project_id: xxx
 
-    # 作业相关配置
-    boot_file: # 微调启动脚本
-    code_url: # caption模型源码根路径
-    data_path: # 数据集根路径
-    pretrained_model_path: # 预训练模型路径
-    log_path: # 日志输出路径
-    output_path: # 模型输出路径
-    user_image_url: # 镜像地址
+      # 作业相关配置
+      boot_file: obs://HwAiUser/omni-perception-pretrainer/src/scripts/train_caption.py  # 微调启动脚本
+      code_url: obs://HwAiUser/omni-perception-pretrainer/code/  # caption模型源码根路径
+      data_path: obs://HwAiUser/omni-perception-pretrainer/dataset/data/  # 数据集根路径
+      pretrained_model_path: obs://HwAiUser/omni-perception-pretrainer/pretrained_model/  # 预训练模型路径
+      log_path: obs://HwAiUser/omni-perception-pretrainer/output/  # 日志输出路径
+      output_path: obs://HwAiUser/omni-perception-pretrainer/output/  # 模型输出路径
+      user_image_url: huawei/mav2-training-image:latest
 
-    # 计算资源配置
-    pool_id: # 专属资源池id, 共享资源池为None
-    node_num: 1
-    device_num: 1
+      # 计算资源配置
+      pool_id: xxx
+      node_num: 2
+      device_num: 8
