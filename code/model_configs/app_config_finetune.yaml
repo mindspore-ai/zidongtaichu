@@ -8,7 +8,7 @@ scenario:
       project_id: xxx
 
       # 作业相关配置
-      boot_file: obs://HwAiUser/omni-perception-pretrainer/src/scripts/train_caption.py  # 微调启动脚本
+      boot_file_path: obs://HwAiUser/omni-perception-pretrainer/code/src/scripts/train_caption.py  # 微调启动脚本
       code_url: obs://HwAiUser/omni-perception-pretrainer/code/  # caption模型源码根路径
       data_path: obs://HwAiUser/omni-perception-pretrainer/dataset/data/  # 数据集根路径
       pretrained_model_path: obs://HwAiUser/omni-perception-pretrainer/pretrained_model/  # 预训练模型路径
