@@ -52,25 +52,25 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 使用微调组件功能前需注册微调组件，运行如下命令，交互输入认证信息：
 
 ```shell
-fm registry  # 依次输入registry type 1，以及对应的ak，sk，endpoint
+fm registry  # 依次输入registry type 1，以及计算中心账号对应的ak，sk，endpoint
 ```
 
 ##### 模型微调
 
 ```shell
-fm finetune --scenario modelarts --app_config obs://HwAiUser/omni-perception-pretrainer/code/fm_configs/caption/app_config_finetune.yaml --model_config_path obs://HwAiUser/code/fm_configs/caption/model_config_finetune.yaml
+fm finetune --scenario modelarts --app_config obs://HwAiUser/omni-perception-pretrainer/code/model_configs/app_config_finetune.yaml --model_config_path obs://HwAiUser/code/model_configs/model_config_finetune.yaml
 ```
 
 ##### 模型评估
 
 ```shell
-fm evaluate --scenario modelarts --app_config obs://HwAiUser/omni-perception-pretrainer/code/fm_configs/caption/app_config_evaluate.yaml --model_config_path obs://HwAiUser/code/fm_configs/caption/model_config_evaluate.yaml
+fm evaluate --scenario modelarts --app_config obs://HwAiUser/omni-perception-pretrainer/code/model_configs/app_config_evaluate.yaml --model_config_path obs://HwAiUser/code/model_configs/model_config_evaluate.yaml
 ```
 
 ##### 模型推理
 
 ```shell
-fm infer --scenario modelarts --app_config obs://HwAiUser/omni-perception-pretrainer/code/fm_configs/caption/app_config_infer.yaml --model_config_path obs://HwAiUser/code/fm_configs/caption/model_config_infer.yaml
+fm infer --scenario modelarts --app_config obs://HwAiUser/omni-perception-pretrainer/code/model_configs/app_config_infer.yaml --model_config_path obs://HwAiUser/code/model_configs/model_config_infer.yaml
 ```
 
 ##### 查看状态
