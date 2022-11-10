@@ -181,18 +181,8 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
        |----------|--------|--------|--------|--------|--------|--------|
        |   448    |    70  |   96   |  98.7  |  64.67 | 93.33  |  98    |
 
-- **4.  以文生图（Text-To-Image）**
 
-   任务简介：\
-   以文生图任务是条件图像生成任务中重要的任务之一，要求模型理解输入文本的语义信息并生成与输入文本描述内容一致的逼真图像。
-
-   启动两阶段训练，在第一阶段训练VQVAE，采用训练好的VQVAE提取图像token；在第二阶段训练Transformer解码器，建模文本token和图像token的跨模态关联关系： \
-   bash scripts/train_txt2img_stageone.sh \
-   bash scripts/train_txt2img_stagetwo.sh
-
-   启动推理（将test_txt2img.sh中ckpt的路径替换为实际权重文件路径）: \
-   bash scripts/test_txt2img.sh
-- **5.  语音合成（Text To Speech）**
+- **4.  语音合成（Text To Speech）**
 
    任务简介：\
    语音合成是输入文本输出语音。
