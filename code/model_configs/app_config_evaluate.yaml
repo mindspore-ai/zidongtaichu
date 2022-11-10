@@ -7,16 +7,16 @@ scenario:
     region_name: cn-central-221
     project_id: xxx
 
-	# 作业相关配置
-    boot_file: obs://HwAiUser/omni-perception-pretrainer/src/scripts/test_caption.py
+    # 作业相关配置
+    boot_file_path: obs://HwAiUser/omni-perception-pretrainer/code/src/scripts/test_caption.py
     code_url: obs://HwAiUser/omni-perception-pretrainer/code/
     data_path: obs://HwAiUser/omni-perception-pretrainer/dataset/data/
-    ckpt_path: obs://HwAiUser/omni-perception-pretrainer/pretrained_model/  # 评估模型文件路径，默认为预训练模型
+    ckpt_path: obs://HwAiUser/omni-perception-pretrainer/pretrained_model/ # 评估模型文件路径，默认为预训练模型
     log_path: obs://HwAiUser/omni-perception-pretrainer/output/
     output_path: obs://HwAiUser/omni-perception-pretrainer/output/
-    user_image_url: huawei/mav2-training-image:latest  # SWR镜像地址
+    user_image_url: huawei/mav2-training-image:latest # SWR镜像地址
 
     # 计算资源配置
-    pool_id: xxx   # 专属资源池id, 共享资源池为None
+    pool_id: xxx # 专属资源池id, 示例：poolxxx
     node_num: 1
-    device_num: 1  # caption评估任务当前只支持单卡
+    device_num: 1 # caption评估任务当前只支持单卡
