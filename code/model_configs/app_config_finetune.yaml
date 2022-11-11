@@ -18,5 +18,5 @@ scenario:
 
     # 计算资源配置
     pool_id: xxx # 专属资源池id, 示例：poolxxx
-    node_num: 2
-    device_num: 8
+    node_num: 1
+    device_num: 1
