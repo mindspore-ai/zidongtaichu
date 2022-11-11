@@ -144,12 +144,17 @@ def inference_list_json(net, image_dir, list_file, vocab, infer_result_path):
     print("infer_config_caption.yaml starts")
     with open(list_file, "r") as f:
         image_list = json.load(f)
+    infer_result = {}
     for image_path in image_list:
-        image_path = image_path
+        image = os.path.join(image_dir, image_path)
         last_time = time.time()
-        inference_output = inference_one(net, os.path.join(image_dir, image_path), vocab)
+        inference_output = inference_one(net, image, vocab)
         print(image_path, time.time() - last_time)
         print(inference_output)
+        infer_result[image] = inference_output
+    with open(infer_result_path, 'w', encoding='utf-8') as file:
+        json.dump(infer_result, file, indent=4, ensure_ascii=False)
+    os.chmod(infer_result_path, 0o750)
 
 
 def load_ckpt(net, ckpt_path):
