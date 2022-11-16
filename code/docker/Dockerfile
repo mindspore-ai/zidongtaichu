@@ -3,7 +3,7 @@ ARG BASE_IMAGE_TAG
 FROM swr.cn-central-221.ovaijisuan.com/mindxsdk/fmtk-ma_base:${BASE_IMAGE_TAG}
 
 ARG TRAINING_CWD=/home/ma-user
-ARG DEPLOY_CWD=/home/mind/model
+ENV DEPLOY_CWD=/home/mind/model
 ARG PKG_PATH=/home/ma-user/pkg
 ARG PYTHON_VERSION
 ARG MINDSPORE_PYTHON_VERSION_SUFFIX
@@ -41,7 +41,7 @@ RUN ${CONDA_PATH} update --yes -n ${CONDA_ENV_NAME} --all && \
 #  1. Install MoXing for mxLaunchKit (execute MA training task without AK/SK)                                          #
 #  2. Install MindSpore and mxTuningKit                                                                                #
 ########################################################################################################################
-# MindSpore, MoXIng, mxTuningKit, VEGA[Optional]
+# MindSpore, MoXing, mxTuningKit, VEGA[Optional]
 RUN pip install $PIP_OPTS ${PKG_PATH}/${MOXING_PKG} && \
     pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/${MINDSPORE_VERSION}/MindSpore/ascend/aarch64/mindspore_ascend-${MINDSPORE_VERSION}-${MINDSPORE_PYTHON_VERSION_SUFFIX}-linux_aarch64.whl --trusted-host ms-release.obs.cn-north-4.myhuaweicloud.com -i https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip install $PIP_OPTS ${PKG_PATH}/${MXTUNINGKIT_PKG} && \

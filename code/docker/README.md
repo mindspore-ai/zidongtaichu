@@ -13,21 +13,22 @@
 * Step 0 配置镜像构建路径
 
 ```shell
-# 可根据实际路径修改变量值
+# 注意将以下命令中的镜像构建目录替换为实际镜像构建目录如：omni-perception-pretrainer/code/docker
 export DOCKER_BUILD_PATH="mindxsdk-mxfoundationmodel/script/docker/modelarts"
 ```
 
-* Step 1 [下载昇腾AI处理器 ARM 平台开发套件软件包](https://www.hiascend.com/software/cann/community-history)，拷贝至 Sample 代码中的镜像构建目录；获取MoXing安装包，拷贝至相同目录：
+* Step 1 [下载昇腾AI处理器 ARM 平台开发套件软件包](https://www.hiascend.com/software/cann/community-history)，拷贝至镜像构建目录下pkg文件夹；获取MoXing安装包，拷贝至相同目录：
 
 ```shell
 cp Ascend-cann-toolkit_5.1.RC2_linux-aarch64.run ${DOCKER_BUILD_PATH}/pkg/
 cp moxing_framework-2.0.0.rc2.4b57a67b-py2.py3-none-any.whl ${DOCKER_BUILD_PATH}/pkg/
 ```
 
-* Step 2 将获取的微调工具包（mxTuningKit）拷贝至 Sample 代码中的镜像构建目录：
+* Step 2 将获取的微调工具包（mxTuningKit）拷贝至镜像构建目录下pkg文件夹：
 
 ```shell
-cp Ascend_mindxsdk_mxTuningKit-xxx-linux_aarch64.whl ${DOCKER_BUILD_PATH}/pkg/
+# 注意将以下命令中的工具包名称替换为实际获取到的名称
+cp Ascend_mindxsdk_mxTuningKit-xxx.whl ${DOCKER_BUILD_PATH}/pkg/
 ```
 
 * Step 3 执行镜像构建：
