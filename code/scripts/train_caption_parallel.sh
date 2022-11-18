@@ -65,6 +65,5 @@ do
     --data_path $data_path \
     --output_path $output_path \
     --model_config_path $model_config_path \
-    --pretrained_model_path $pretrained_model_path \
-    > $output_path/$task_name/rank_$i/log_train 2>&1 &
+    --pretrained_model_path $pretrained_model_path
 done
