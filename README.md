@@ -34,7 +34,7 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 
    [下载COCO图片数据测试集](http://images.cocodataset.org/zips/val2014.zip)，将所有图片解压至`{opt模型根目录}/dataset/data/train/img/mscoco/val2014/`路径；
 
-   准备任意张以`.jpg`或`.png`为后缀的图片文件，放置在`{opt模型根目录}/dataset/data_infer/`目录下推理数据集。
+   准备推理数据集，将任意张以`.jpg`或`.png`为后缀的图片文件，放置在`{opt模型根目录}/dataset/data_infer/`目录，还需将`{opt模型根目录}/dataset/data/ids_to_tokens_zh.json`文件拷贝至该目录。
 
 3. [下载预训练模型文件](https://opt-release.obs.cn-central-221.ovaijisuan.com:443/model/OPT_1-38_136.ckpt)（`OPT_1-38_136.ckpt`）存放至`{opt模型根目录}/pretrained_model`路径。
 
