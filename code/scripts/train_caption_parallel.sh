@@ -65,5 +65,5 @@ do
     --data_path $data_path \
     --output_path $output_path \
     --model_config_path $model_config_path \
-    --pretrained_model_path $pretrained_model_path
+    --pretrained_model_path $pretrained_model_path &
 done
