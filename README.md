@@ -78,7 +78,7 @@ fm infer --scenario modelarts --app_config obs://HwAiUser/omni-perception-pretra
 - 查看任务运行状态
 
 ```shell
-fm job-status --job_id ***  # ***为job_id，任务拉起成功后生成
+fm job-status --scenario modelarts --app_config obs://HwAiUser/omni-perception-pretrainer/code/model_configs/app_config_finetune.yaml --job_id ***  # ***为job_id，任务拉起成功后生成
 ```
 
 

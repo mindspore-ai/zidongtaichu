@@ -35,7 +35,7 @@ cp Ascend_mindxsdk_mxTuningKit-xxx.whl ${DOCKER_BUILD_PATH}/pkg/
 
 ```shell
 # fmtk-ma:py_3.9-ms_1.8.1_cann_5.1.RC2-euler_2.8.3-aarch64-d910-{timestamp}
-sh ${DOCKER_BUILD_PATH}/build.sh
+bash ${DOCKER_BUILD_PATH}/build.sh
 ```
 
 * Step 4 参考 **附录A** 部分，按照生成的登录指令登陆至 SWR ，将新构建镜像上传：
