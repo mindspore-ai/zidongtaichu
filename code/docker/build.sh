@@ -11,7 +11,6 @@ current_time=$(date +%Y%m%d%H%M%S)
 python_version=
 mindspore_python_version_suffix=
 mxtuningkit_pkg=
-moxing_pkg=
 cann_toolkit_pkg=
 cann_toolkit_version=
 mindspore_version=
@@ -64,11 +63,6 @@ function get_pkg()
         elif [ ${1} == "cann_toolkit" ]; then
             cann_toolkit_pkg=${pkgs[pkg_index]}
             echo -e "Use ${cann_toolkit_pkg} in current docker image building task."
-            split
-            return 0
-        elif [ ${1} == "moxing" ]; then
-            moxing_pkg=${pkgs[pkg_index]}
-            echo -e "Use ${moxing_pkg} in current docker image building task."
             split
             return 0
         fi
@@ -138,36 +132,30 @@ function set_cann_toolkit_version()
     cann_toolkit_version=${array[1]}
 }
 
-if check_pkg "./pkg/moxing_framework-*-none-any.whl"; then
-    echo -e "MoXing package from ModelArts is required."
-elif check_pkg "./pkg/Ascend_mindxsdk_mxTuningKit-*.whl"; then
+if check_pkg "./pkg/Ascend_mindxsdk_mxTuningKit-*.whl"; then
     echo -e "mxTuningKit package is required."
 elif check_pkg "./pkg/Ascend-cann-toolkit_*.run"; then
     echo -e "Installation package of CANN is required."
 else
     # mxTuningKit pkg
     if get_pkg "mxtuningkit" "Ascend_mindxsdk_mxTuningKit-*"; then
-        # moxing pkg
-        if get_pkg "moxing" "moxing_framework-*"; then
-            # cann-toolkit pkg
-            if get_pkg "cann_toolkit" "Ascend-cann-toolkit_*"; then
-                set_cann_toolkit_version
-                if set_mindspore_version; then
-                    echo -e "Invalid mindspore version."
-                elif set_python_version; then
-                    echo -e "Invalid python version."
-                else
-                    image_prefix="fmtk-ma:py_${python_version}-ms_${mindspore_version}_cann_${cann_toolkit_version}-euler_2.8.3-aarch64-d910-"
-                    docker build --rm=true --no-cache \
-                                 --build-arg BASE_IMAGE_TAG="2022110901" \
-                                 --build-arg MXTUNINGKIT_PKG=${mxtuningkit_pkg} \
-                                 --build-arg MOXING_PKG=${moxing_pkg} \
-                                 --build-arg CANN_TOOLKIT_PKG=${cann_toolkit_pkg} \
-                                 --build-arg MINDSPORE_VERSION=${mindspore_version} \
-                                 --build-arg PYTHON_VERSION=${python_version} \
-                                 --build-arg MINDSPORE_PYTHON_VERSION_SUFFIX=${mindspore_python_version_suffix} \
-                                 -t ${image_prefix}${current_time} -f Dockerfile .
-                fi
+        # cann-toolkit pkg
+        if get_pkg "cann_toolkit" "Ascend-cann-toolkit_*"; then
+            set_cann_toolkit_version
+            if set_mindspore_version; then
+                echo -e "Invalid mindspore version."
+            elif set_python_version; then
+                echo -e "Invalid python version."
+            else
+                image_prefix="fmtk-ma:py_${python_version}-ms_${mindspore_version}_cann_${cann_toolkit_version}-euler_2.8.3-aarch64-d910-"
+                docker build --rm=true --no-cache \
+                             --build-arg BASE_IMAGE_TAG="2022110901" \
+                             --build-arg MXTUNINGKIT_PKG=${mxtuningkit_pkg} \
+                             --build-arg CANN_TOOLKIT_PKG=${cann_toolkit_pkg} \
+                             --build-arg MINDSPORE_VERSION=${mindspore_version} \
+                             --build-arg PYTHON_VERSION=${python_version} \
+                             --build-arg MINDSPORE_PYTHON_VERSION_SUFFIX=${mindspore_python_version_suffix} \
+                             -t ${image_prefix}${current_time} -f Dockerfile .
             fi
         fi
     fi

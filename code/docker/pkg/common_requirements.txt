@@ -9,6 +9,7 @@ sympy
 tqdm
 cytoolz
 lmdb
+lxml
 lz4
 msgpack
 msgpack_numpy
