@@ -40,7 +40,7 @@ Base模型由MSCOCO、AIC、CC3M数据集训练。
 
 AIC数据集是大规模中文Caption数据集，包括21万训练集图像、3万验证集图像，每张图像有5条描述的中文标签，详细介绍见《AI Challenger : A Large-scale Dataset for Going Deeper in Image Understanding》。
 
-CC3M数据集，自动化所将标签从英文翻译为中文，该数据集的训练集包括越300万张图像，实际下载280万左右，每张图像有1条描述的中文标签。
+CC3M数据集，自动化所将标签从英文翻译为中文，该数据集的训练集包括约300万张图像，实际下载280万左右，每张图像有1条描述的中文标签。
 
 
 
