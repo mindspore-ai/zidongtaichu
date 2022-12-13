@@ -1,0 +1,15 @@
+tqdm
+cytoolz
+sympy
+lmdb
+lz4
+msgpack
+msgpack_numpy
+easydict
+pathlib2
+unidecode
+inflect
+pyyaml
+jieba
+matplotlib
+opencv-python
