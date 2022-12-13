@@ -5,4 +5,4 @@
 
 ## 应用价值
 
-![输入图片说明](image/opt.png)
+![输入图片说明](Taichu-OPT-v1/image/opt.png)
