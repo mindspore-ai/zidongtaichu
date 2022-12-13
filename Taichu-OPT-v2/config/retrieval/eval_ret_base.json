@@ -1,0 +1,53 @@
+{
+  "model_config": "config/pretrain/model_base.json",
+  "output_dir": "output_opt_v2_base",
+  "ckpt_file": "pretrained/opt_v2_base.ckpt",
+  "train_batch_size": 10,
+  "val_batch_size": 1,
+  "is_two": true,
+  "dropout": 0.1,
+  "seed": 42,
+  "use_vit": true,
+  "use_patch": true,
+  "patch_size": 16,
+  "image_size": 224,
+  "embed_size": 512,
+  "train_datasets": [
+    {
+      "name": "open",
+      "db": [
+        "dataset/text"
+      ],
+      "img": [
+        "dataset/image"
+      ],
+      "audio": [
+        "dataset/audio"
+      ],
+      "tasks": [
+        "itmTwo"
+      ],
+      "mix_ratio": [
+        1
+      ]
+    }
+  ],
+  "ids_val_path": "dataset/text/flickr30k_test_zh_token.json",
+  "val_datasets": [
+    {
+      "name": "open",
+      "db": [
+        "dataset/text"
+      ],
+      "img": [
+        "dataset/image"
+      ],
+      "audio": [
+        "dataset/audio"
+      ],
+      "tasks": [
+        "itmTwo"
+      ]
+    }
+  ]
+}
