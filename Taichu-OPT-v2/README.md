@@ -34,7 +34,7 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 
 ### 数据集介绍：
 
-Base模型由MSCOOC、AIC、CC3M数据集训练。
+Base模型由MSCOCO、AIC、CC3M数据集训练。
 
 其中是COCO Caption的数据集，自动化所将标签从英文翻译为中文，该数据集的训练集包括11.3万张图像，每张图像有5条描述的中文标签，测试集有5千张图像，每张图像5条描述的中文标签。
 
