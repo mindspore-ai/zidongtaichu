@@ -213,9 +213,6 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 
 - 基于自监督预训练的多任务语音建模技术
 
-## 应用价值
-
-![输入图片说明](image/opt.png)
 
 ## 引用说明
 
