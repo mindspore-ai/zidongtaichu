@@ -96,7 +96,7 @@ CC3M数据集，自动化所将标签从英文翻译为中文，该数据集的�
    数据集介绍：该数据集是MSCOCO数据。
 
    预训练模型与数据下载: \
-   链接: https://pan.baidu.com/s/14a7lEK9aO4axoHevZSTs7A?pwd=xm1u \
+   链接: https://pan.baidu.com/s/1nFfT3zYyKWhDBxcRoiauvw?pwd=tic6 \
    将模型和数据按照如下目录存放
     
     ```
@@ -128,7 +128,7 @@ CC3M数据集，自动化所将标签从英文翻译为中文，该数据集的�
    数据集介绍：该数据集是百度发布的中文VQA数据集 FM-IQA，图片来自于COCO，每张图片对应一到两个问题。
 
    预训练模型与数据下载: \
-   链接: https://pan.baidu.com/s/14a7lEK9aO4axoHevZSTs7A?pwd=xm1u \
+   链接: https://pan.baidu.com/s/1nFfT3zYyKWhDBxcRoiauvw?pwd=tic6 \
    将模型和数据按照如下目录存放
     
     ```
