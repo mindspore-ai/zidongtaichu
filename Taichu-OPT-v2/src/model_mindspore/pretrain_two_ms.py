@@ -47,13 +47,14 @@ class UniterTwoForPretrainingWithLoss(nn.Cell):
         is_parallel = args.use_pipeline
 
         parallel_config = ParallelConfig()
-        config = UniterConfig.from_json_file(config)
-        config.full_batch = full_batch
-        config.use_pipeline = args.use_pipeline
-        config.batch_size = args.train_batch_size
-        config.seq_length = C.MAX_IMG_TEXT_LEN
-        config.patch_size = C.IMG_PATCH_SIZE
-        config.train_image_size = C.IMG_SIZE
+        if(isinstance(config, UniterConfig) == False):
+            config = UniterConfig.from_json_file(config)
+            config.full_batch = full_batch
+            config.use_pipeline = args.use_pipeline
+            config.batch_size = args.train_batch_size
+            config.seq_length = C.MAX_IMG_TEXT_LEN
+            config.patch_size = C.IMG_PATCH_SIZE
+            config.train_image_size = C.IMG_SIZE
 
         self.uniter = UniterThreeModel(config, img_dim, audio_dim, parallel_config, use_moe, is_parallel)
 

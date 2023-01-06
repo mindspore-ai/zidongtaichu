@@ -18,7 +18,7 @@ import os
 import json
 from ..config import config
 import numpy as np
-import mindspore.dataset.vision.c_transforms as C
+import mindspore.dataset.vision as C
 from mindspore.dataset.vision.utils import Inter
 from PIL import Image
 import random
@@ -153,7 +153,12 @@ def load_large_data(path_root, total, rank, size):
 
 
 def get_size_rank():
-    size, rank = get_group_size(), get_rank()
+    try:
+        size, rank = get_group_size(), get_rank()
+    except Exception as e:
+        print(e)
+        size = 1
+        rank = 0
     return size, rank
 
 # Image feature, Text token, Audio feature

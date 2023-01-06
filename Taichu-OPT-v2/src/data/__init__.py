@@ -13,8 +13,10 @@
 # limitations under the License.
 # ============================================================================
 
-from .sampler import EasySampler, BatchSampler
+from .sampler import EasySampler, BatchSampler, RawSampler
 from .loader_two import MetaLoaderTwo, task2id_two, data_column_two
+from .loader_two_ft import MetaLoaderTwoFt, data_column_two_ft
+
 from .data_three import (TxtData, ImgData, AudioData)
 from .itm_three import ItmHardTwoDataset, itmHardTwo_collate
 from .dataset import create_dataset

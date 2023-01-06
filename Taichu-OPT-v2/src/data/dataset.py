@@ -17,6 +17,7 @@ Create dataset for training and evaluating
 """
 from mindspore.dataset import GeneratorDataset
 from src.data import MetaLoaderTwo, data_column_two
+from src.data import MetaLoaderTwoFt, data_column_two_ft
 from src.tools.misc import set_random_seed
 from src.data.pretrain_three_data import create_three_dataloaders
 
@@ -51,9 +52,14 @@ def create_dataset(opts, device_num=1, is_train=True):
         batch_size = opts.val_batch_size
 
     datalen = datalen // batch_size
-
-    metaloader = MetaLoaderTwo(train_data_loaders, datalen=datalen, task_num=len(train_data_loaders.keys()))
-    dataset = GeneratorDataset(metaloader, column_names=data_column_two, shuffle=False)
+    
+    mode = 'finetune' if (is_train and opts.train_datasets[0]['tasks'][0].startswith('ft')) else 'pretrain'
+    if(mode == 'pretrain'):
+        metaloader = MetaLoaderTwo(train_data_loaders, datalen=datalen, task_num=len(train_data_loaders.keys()))
+        dataset = GeneratorDataset(metaloader, column_names=data_column_two, shuffle=False)
+    else:
+        metaloader = MetaLoaderTwoFt(train_data_loaders, datalen=datalen, task_num=len(train_data_loaders.keys()))
+        dataset = GeneratorDataset(metaloader, column_names=data_column_two_ft, shuffle=False)
 
     # If eod_reset enabled, another two inputs will be generated through input_ids
     return dataset

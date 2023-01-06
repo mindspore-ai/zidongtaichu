@@ -1,0 +1,39 @@
+{
+    "model_config": "config/caption/model_cap_base.json",
+    "output_dir": "output/caption_base",
+    "ckpt_file": "pretrained/OPT-CAP-2_2213.ckpt",
+    "train_batch_size": 32,
+    "val_batch_size": 100,
+    "full_batch": false,
+    "is_two": true,
+    "seed": 42,
+    "ids_val_path": "dataset/text/json_coco_test_zh_token_for_cap.json",
+    "gt_path": "dataset/text/json_coco_trans_captions.json",
+    "vocab_path": "dataset/text/ids_to_tokens_zh.json",
+    "use_vit": true,
+    "use_patch": true,
+    "text_len":30,
+    "patch_size": 16,
+    "image_size": 384,
+    "embed_size": 512,
+    "beam_width": 4,
+    "vit_ckpt_file": "",
+    "val_datasets": [
+      {
+        "name": "open",
+        "db": [
+          "dataset/text"
+        ],
+        "img": [
+          "dataset/image"
+        ],
+        "audio": [
+          "dataset/audio"
+        ],
+        "tasks": [
+          "ftCap"
+        ]
+      }
+    ]
+  }
+  

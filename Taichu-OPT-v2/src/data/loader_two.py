@@ -15,7 +15,10 @@ from .data_loader import DataLoader
 from mindspore.communication.management import get_rank
 
 task2id_two = {
-    'itmTwo': 0
+    'itmTwo': 0,
+    'ftCap': 1,
+    'ftVqa': 2,
+    'ftRet': 3
 }
 
 data_column_two = [

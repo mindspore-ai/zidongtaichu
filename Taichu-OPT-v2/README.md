@@ -34,13 +34,13 @@ OPT（Omni-Perception Pre-Trainer）是全场景感知预训练模型的简称�
 
 ### 数据集介绍：
 
-Base模型由MSCOCO、AIC、CC3M数据集训练。
+Base模型由MSCOOC、AIC、CC3M数据集训练。
 
 其中是COCO Caption的数据集，自动化所将标签从英文翻译为中文，该数据集的训练集包括11.3万张图像，每张图像有5条描述的中文标签，测试集有5千张图像，每张图像5条描述的中文标签。
 
 AIC数据集是大规模中文Caption数据集，包括21万训练集图像、3万验证集图像，每张图像有5条描述的中文标签，详细介绍见《AI Challenger : A Large-scale Dataset for Going Deeper in Image Understanding》。
 
-CC3M数据集，自动化所将标签从英文翻译为中文，该数据集的训练集包括约300万张图像，实际下载280万左右，每张图像有1条描述的中文标签。
+CC3M数据集，自动化所将标签从英文翻译为中文，该数据集的训练集包括越300万张图像，实际下载280万左右，每张图像有1条描述的中文标签。
 
 
 
@@ -53,7 +53,7 @@ CC3M数据集，自动化所将标签从英文翻译为中文，该数据集的�
    例如输入图片，在文本库中挑选出与图片内容最匹配的描述；输入描述，在图片库中挑出与这句描述内容最符合的图片。
    ![输入图片说明](image/image_retrieval.png)
 
-   数据集介绍：该数据集是Flickr30K-CN数据，测试集包括1000张图像，每张图像5个中文描述文本。
+   数据集介绍：该数据集是Flick-CN数据，测试集包括1000张图像，每张图像5个中文描述文本。
 
    预训练模型与数据下载: \
    链接: https://pan.baidu.com/s/14a7lEK9aO4axoHevZSTs7A?pwd=xm1u \
@@ -78,15 +78,73 @@ CC3M数据集，自动化所将标签从英文翻译为中文，该数据集的�
 
    评估结果：
 
-    |模型 | 数据量 |  IR @1  |  IR @5   |  IR @10   |  TR @1   |  TR @5   |  TR @10  |
-    |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-    |Wukong ViT-B/32 |  100M | 45.7  |  73.8  |  82.2  |  66.2  |  88.7  |  94.3   |
-    |Wukong ViT-L    |  100M | 51.7  |  78.9  |  86.3  |  76.1  |  94.8  |  97.5   |
-    |R2D2 ViT-L      |  23M  | 55.9  |  83.5  |  90.6  |  70.2  |  94.1  |  97.6   |
-    |R2D2 ViT-L      |  250M | 60.9  |  86.8  |  92.7  |  77.6  |  96.7  |  98.9   |
-    |CN-CLIP ViT-B/16|  200M | 62.7  |  86.9  |  92.8  |  74.6  |  93.5  |  97.1   |
-    |**OPT ViT-B/16**|  3M   | **69.6**  |  **90.3**  |  **94.7**  |  **85.1**  |  **97.4**  |  **99.1**   |
+    | 输入尺寸  | IR @1  |  IR @5   |  IR @10   |  TR @1   |  TR @5   |  TR @10   |
+    |:-----:|:-----:|:---:|:---:|:---:|:---:|:---:|
+    |  224  | 69.56 |  90.32   |  94.66   |  85.1   |  97.4   |  99.1   |
 
+- **2.  图像描述（Image Caption）**
+   
+   任务简介：\
+   输入图片,生成对应的文字描述。\
+   ![输入图片说明](image/image_caption.png)
+
+   数据集介绍：该数据集是MSCOCO数据。
+
+   预训练模型与数据下载: \
+   链接: https://pan.baidu.com/s/14a7lEK9aO4axoHevZSTs7A?pwd=xm1u \
+   将模型和数据按照如下目录存放
+    
+    ```
+    ${CODE_PATH}/
+    ├── pretrained/
+    └── dataset/
+            ├── image/
+            │     ├── flickr30k-images
+            │     └── mscoco
+            └── text/
+                  ├── bert-base-chinese-vocab.txt
+                  ├── json_coco_train_zh_token_for_cap.json
+                  ├── json_coco_test_zh_token_for_cap.json
+                  ├── json_coco_trans_captions.json
+                  ├── ids_to_tokens_zh.json
+                  └── meta.json
+    ```
+
+   启动训练和测试：\
+   bash scripts/fintune_caption.sh
+   bash scripts/test_caption.sh
+
+- **3.  视觉问答（Visual Question Answering）**
+   
+   任务简介：\
+   输入图片和文字问题,生成对应的文字回答。\
+   ![输入图片说明](image/image_vqa.png)
+
+   数据集介绍：该数据集是百度发布的中文VQA数据集 FM-IQA，图片来自于COCO，每张图片对应一到两个问题。
+
+   预训练模型与数据下载: \
+   链接: https://pan.baidu.com/s/14a7lEK9aO4axoHevZSTs7A?pwd=xm1u \
+   将模型和数据按照如下目录存放
+    
+    ```
+    ${CODE_PATH}/
+    ├── pretrained/
+    └── dataset/
+            ├── image/
+            │     ├── flickr30k-images
+            │     └── mscoco
+            └── text/
+                  ├── bert-base-chinese-vocab.txt
+                  ├── FM-IQA_train_token_ids_for_vqa.json
+                  ├── FM-IQA_val_token_ids.json
+                  ├── FM-IQA.json
+                  ├── ids_to_tokens_zh.json
+                  └── meta.json
+    ```
+
+   启动训练和测试：\
+   bash scripts/fintune_vqa.sh
+   bash scripts/test_vqa.sh
 
 ## 模型创新
 
