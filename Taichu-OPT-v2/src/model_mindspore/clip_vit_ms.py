@@ -370,6 +370,38 @@ def load_clip_vit_base_patch16(ckpt_path):
 
     return visual_encoder
 
+def load_clip_vit_base_patch16_384_ft(ckpt_path):
+
+    image_size = 384
+    patch_size = 16
+    hidden_size = 768
+    hidden_act = ""
+    num_attention_heads = 12
+    attention_dropout = 0.1
+    intermediate_size = 3072
+    num_hidden_layers = 12
+
+    visual_encoder = CLIPVisionTransformer(image_size, patch_size, hidden_size, hidden_act, num_attention_heads,
+                                           attention_dropout, intermediate_size, num_hidden_layers)
+
+    return visual_encoder
+
+def load_clip_vit_base_patch16_480_ft(ckpt_path):
+
+    image_size = 480
+    patch_size = 16
+    hidden_size = 768
+    hidden_act = ""
+    num_attention_heads = 12
+    attention_dropout = 0.1
+    intermediate_size = 3072
+    num_hidden_layers = 12
+
+    visual_encoder = CLIPVisionTransformer(image_size, patch_size, hidden_size, hidden_act, num_attention_heads,
+                                           attention_dropout, intermediate_size, num_hidden_layers)
+
+    return visual_encoder
+
 def load_clip_vit_large_patch14(ckpt_path):
 
     image_size = 224

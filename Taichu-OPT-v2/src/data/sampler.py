@@ -20,6 +20,27 @@ sampler for length bucketing (batch by tokens)
 """
 import random
 
+class RawSampler:
+    """
+        Sampler for token bucket path, last bacth maybe less then batch_size
+    """
+    def __init__(self, dataset, batch_size):
+        self.dataset = dataset
+        self.per_batch = batch_size
+        print(f"per_batch => {self.per_batch}")
+
+    def _create_ids(self):
+        return list(range(len(self.dataset)))
+
+    def __iter__(self):
+        ids = self._create_ids()
+        batches = [ids[i:i + self.per_batch] for i in range(0, len(ids), self.per_batch)]
+        return iter(batches)
+
+    def __len__(self):
+        raise ValueError("NOT supported. "
+                         "This has some randomness across epochs")
+
 class EasySampler:
     """
         Sampler for token bucket path

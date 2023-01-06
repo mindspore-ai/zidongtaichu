@@ -26,7 +26,7 @@ from mindspore.nn.transformer import TransformerOpParallelConfig
 from mindspore.communication.management import get_group_size
 from mindspore.nn import Cell
 from src.model_mindspore.parallel_transformer import Dropout, LayerNorm, ParallelConfig
-from src.model_mindspore.clip_vit_ms import load_clip_vit_base_patch16, load_clip_vit_large_patch14_336
+from src.model_mindspore.clip_vit_ms import load_clip_vit_base_patch16, load_clip_vit_large_patch14_336, load_clip_vit_base_patch16_384_ft, load_clip_vit_base_patch16_480_ft
 
 logger = logging.getLogger(__name__)
 
@@ -377,6 +377,19 @@ def freeze_net(net):
     for param in net.get_parameters():
         param.requires_grad = False
 
+def freeze_part_vit_net(vit):
+    for param in vit.get_parameters():
+        if ('vit.encoder.layers.11.' in param.name):
+            print('unfreeze ', param.name)
+            param.requires_grad = True
+            continue
+        if (param.name == 'vit.pos_embed.embedding_table'):
+            print('unfreeze vit.pos_embed.embedding_table')
+            param.requires_grad = True
+            continue
+        param.requires_grad = False
+    print("freeze other part vit")
+
 class UniterImageEmbeddings(nn.Cell):
     """ UniterImageEmbeddings """
 
@@ -431,6 +444,10 @@ class UniterImageEmbeddings(nn.Cell):
                     vit_model = load_clip_vit_base_patch16(config.vit_ckpt_file)
                 elif self.vit_type == "vit_base_patch14_336":
                     vit_model = load_clip_vit_large_patch14_336(config.vit_ckpt_file)
+                elif self.vit_type == 'vit_base_patch16_384_ft':
+                    vit_model = load_clip_vit_base_patch16_384_ft(config.vit_ckpt_file)
+                elif self.vit_type == 'vit_base_patch16_480_ft':
+                    vit_model = load_clip_vit_base_patch16_480_ft(config.vit_ckpt_file)
                 else:
                     raise Exception("Error Vit Type")
 
@@ -441,8 +458,11 @@ class UniterImageEmbeddings(nn.Cell):
                 # print("===============net_not_load================", net_not_load)
                 self.vit = vit_model
                 if self.vit_freeze:
-                    print("freeze vit")
-                    freeze_net(self.vit)
+                    if self.vit_type in ('vit_base_patch16_384_ft', 'vit_base_patch16_480_ft'):
+                        freeze_part_vit_net(self.vit)
+                    else:
+                        print("freeze vit")
+                        freeze_net(self.vit)
                 else:
                     print("not freeze vit")
 

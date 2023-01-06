@@ -1,0 +1,39 @@
+{
+    "model_config": "config/vqa/model_vqa_base.json",
+    "output_dir": "output/vqa_base",
+    "ckpt_file": "pretrained/OPT-VQA-5_1286.ckpt",
+    "train_batch_size": 32,
+    "val_batch_size": 30,
+    "full_batch": false,
+    "is_two": true,
+    "seed": 42,
+    "ids_val_path": "dataset/text/FM-IQA_val_token_ids.json",
+    "gt_path": "dataset/text/FM-IQA.json",
+    "vocab_path": "dataset/text/ids_to_tokens_zh.json",
+    "use_vit": true,
+    "use_patch": true,
+    "text_len":30,
+    "patch_size": 16,
+    "image_size": 480,
+    "embed_size": 512,
+    "beam_width": 4,
+    "vit_ckpt_file": "",
+    "val_datasets": [
+      {
+        "name": "open",
+        "db": [
+          "dataset/text"
+        ],
+        "img": [
+          "dataset/image"
+        ],
+        "audio": [
+          "dataset/audio"
+        ],
+        "tasks": [
+          "ftVqa"
+        ]
+      }
+    ]
+  }
+  

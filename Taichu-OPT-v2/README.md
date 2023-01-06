@@ -87,6 +87,69 @@ CC3M数据集，自动化所将标签从英文翻译为中文，该数据集的�
     |CN-CLIP ViT-B/16|  200M | 62.7  |  86.9  |  92.8  |  74.6  |  93.5  |  97.1   |
     |**OPT ViT-B/16**|  3M   | **69.6**  |  **90.3**  |  **94.7**  |  **85.1**  |  **97.4**  |  **99.1**   |
 
+- **2.  图像描述（Image Caption）**
+   
+   任务简介：\
+   输入图片,生成对应的文字描述。\
+   ![输入图片说明](image/image_caption.png)
+
+   数据集介绍：该数据集是MSCOCO数据。
+
+   预训练模型与数据下载: \
+   链接: https://pan.baidu.com/s/1nFfT3zYyKWhDBxcRoiauvw?pwd=tic6 \
+   将模型和数据按照如下目录存放
+    
+    ```
+    ${CODE_PATH}/
+    ├── pretrained/
+    └── dataset/
+            ├── image/
+            │     ├── flickr30k-images
+            │     └── mscoco
+            └── text/
+                  ├── bert-base-chinese-vocab.txt
+                  ├── json_coco_train_zh_token_for_cap.json
+                  ├── json_coco_test_zh_token_for_cap.json
+                  ├── json_coco_trans_captions.json
+                  ├── ids_to_tokens_zh.json
+                  └── meta.json
+    ```
+
+   启动训练和测试：\
+   bash scripts/fintune_caption.sh
+   bash scripts/test_caption.sh
+
+- **3.  视觉问答（Visual Question Answering）**
+   
+   任务简介：\
+   输入图片和文字问题,生成对应的文字回答。\
+   ![输入图片说明](image/image_vqa.png)
+
+   数据集介绍：该数据集是百度发布的中文VQA数据集 FM-IQA，图片来自于COCO，每张图片对应一到两个问题。
+
+   预训练模型与数据下载: \
+   链接: https://pan.baidu.com/s/1nFfT3zYyKWhDBxcRoiauvw?pwd=tic6 \
+   将模型和数据按照如下目录存放
+    
+    ```
+    ${CODE_PATH}/
+    ├── pretrained/
+    └── dataset/
+            ├── image/
+            │     ├── flickr30k-images
+            │     └── mscoco
+            └── text/
+                  ├── bert-base-chinese-vocab.txt
+                  ├── FM-IQA_train_token_ids_for_vqa.json
+                  ├── FM-IQA_val_token_ids.json
+                  ├── FM-IQA.json
+                  ├── ids_to_tokens_zh.json
+                  └── meta.json
+    ```
+
+   启动训练和测试：\
+   bash scripts/fintune_vqa.sh
+   bash scripts/test_vqa.sh
 
 ## 模型创新
 
